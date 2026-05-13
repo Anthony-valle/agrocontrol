@@ -166,21 +166,81 @@ class CosechaController extends Controller
     public function facturas(Cosecha $cosecha)
     {
         if ($this->cosechaFacturasDisponible()) {
-            $cosecha->load(['cultivo', 'facturas.creador']);
+            $cosecha->load([
+                'cultivo:id,nombre',
+                'facturas' => function ($query) {
+                    $query->select([
+                        'id',
+                        'cosecha_id',
+                        'numero_factura',
+                        'cliente',
+                        'fecha_factura',
+                        'cantidad_vendida',
+                        'precio_unitario',
+                        'total',
+                        'archivo',
+                        'observaciones',
+                        'created_by',
+                        'created_at',
+                    ])->orderByDesc('fecha_factura')->orderByDesc('id');
+                },
+                'facturas.creador:id,usuario',
+            ]);
         } else {
             $cosecha->load(['cultivo']);
             $cosecha->setRelation('facturas', collect());
         }
 
         $empresa = Empresa::find($cosecha->empresa_id);
+        $logoEmpresa = $this->resolverLogoEmpresa($empresa);
 
-        return view('modules.cosechas.facturas', compact('cosecha', 'empresa'));
+        if (! (request()->ajax() || request()->expectsJson())) {
+            return view('modules.cosechas.facturas_page', [
+                'cosecha' => $cosecha,
+                'empresa' => $empresa,
+                'logoEmpresa' => $logoEmpresa,
+                'titulo' => 'Factura de cosecha',
+                'renderInModal' => false,
+            ]);
+        }
+
+        return view('modules.cosechas.facturas', [
+            'cosecha' => $cosecha,
+            'empresa' => $empresa,
+            'logoEmpresa' => $logoEmpresa,
+            'renderInModal' => true,
+        ]);
+    }
+
+    public function descarte(Cosecha $cosecha)
+    {
+        $cosecha->load(['cultivo:id,nombre']);
+
+        $empresa = Empresa::find($cosecha->empresa_id);
+        $logoEmpresa = $this->resolverLogoEmpresa($empresa);
+        $cantidadVendida = $this->cosechaFacturasDisponible()
+            ? (float) $cosecha->facturas()->sum('cantidad_vendida')
+            : 0;
+
+        return view('modules.cosechas.descarte_page', [
+            'cosecha' => $cosecha,
+            'empresa' => $empresa,
+            'logoEmpresa' => $logoEmpresa,
+            'cantidadVendida' => $cantidadVendida,
+            'titulo' => 'Baja por descarte',
+        ]);
     }
 
     public function storeFactura(Request $request, Cosecha $cosecha)
     {
         if (! $this->cosechaFacturasDisponible()) {
-            return response()->json(['message' => 'La tabla de facturas de cosecha no existe en la base de datos actual.'], 422);
+            $message = 'La tabla de facturas de cosecha no existe en la base de datos actual.';
+
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['message' => $message], 422);
+            }
+
+            return redirect()->route('cosecha.facturadas.index')->with('error', $message);
         }
 
         $request->validate([
@@ -194,9 +254,13 @@ class CosechaController extends Controller
         ]);
 
         if ($request->cantidad_vendida > $cosecha->cantidad_disponible) {
-            return response()->json([
-                'message' => 'La cantidad vendida no puede ser mayor que la cantidad disponible de la cosecha.'
-            ], 422);
+            $message = 'La cantidad vendida no puede ser mayor que la cantidad disponible de la cosecha.';
+
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['message' => $message], 422);
+            }
+
+            return back()->withInput()->withErrors(['cantidad_vendida' => $message]);
         }
 
         try {
@@ -227,9 +291,153 @@ class CosechaController extends Controller
                 $cosecha->decrement('cantidad_disponible', $cantidadVendida);
             });
 
-            return response()->json(['success' => 'Factura de venta registrada correctamente.'], 200);
+            $message = 'Factura de venta registrada correctamente.';
+
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['success' => $message], 200);
+            }
+
+            return redirect()->route('cosecha.facturadas.index')->with('success', $message);
         } catch (\Throwable $error) {
-            return response()->json(['message' => $error->getMessage() ?: 'No se pudo registrar la factura.'], 422);
+            $message = $error->getMessage() ?: 'No se pudo registrar la factura.';
+
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['message' => $message], 422);
+            }
+
+            return back()->withInput()->with('error', $message);
+        }
+    }
+
+    public function editFactura(int $factura)
+    {
+        if (! $this->cosechaFacturasDisponible()) {
+            abort(404);
+        }
+
+        $factura = CosechaFactura::with(['cosecha.cultivo:id,nombre'])->findOrFail($factura);
+        $cosecha = $factura->cosecha;
+        $empresa = Empresa::find($factura->empresa_id);
+        $logoEmpresa = $this->resolverLogoEmpresa($empresa);
+        $cantidadDisponibleEditable = (float) $cosecha->cantidad_disponible + (float) $factura->cantidad_vendida;
+
+        return view('modules.cosechas.factura_edit_page', [
+            'factura' => $factura,
+            'cosecha' => $cosecha,
+            'empresa' => $empresa,
+            'logoEmpresa' => $logoEmpresa,
+            'cantidadDisponibleEditable' => $cantidadDisponibleEditable,
+            'titulo' => 'Editar factura de cosecha',
+        ]);
+    }
+
+    public function updateFactura(Request $request, int $factura)
+    {
+        if (! $this->cosechaFacturasDisponible()) {
+            return redirect()->route('cosecha.facturadas.index')->with('error', 'La tabla de facturas de cosecha no existe en la base de datos actual.');
+        }
+
+        $factura = CosechaFactura::with('cosecha')->findOrFail($factura);
+        $cosecha = $factura->cosecha;
+
+        $request->validate([
+            'numero_factura' => 'required|string|max:100',
+            'cliente' => 'nullable|string|max:150',
+            'fecha_factura' => 'required|date',
+            'cantidad_vendida' => 'required|numeric|min:0.01',
+            'precio_unitario' => 'required|numeric|min:0',
+            'archivo' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
+            'observaciones' => 'nullable|string',
+        ]);
+
+        $cantidadVendidaNueva = (float) $request->cantidad_vendida;
+        $cantidadVendidaActual = (float) $factura->cantidad_vendida;
+        $cantidadDisponibleEditable = (float) $cosecha->cantidad_disponible + $cantidadVendidaActual;
+
+        if ($cantidadVendidaNueva > $cantidadDisponibleEditable) {
+            return back()->withInput()->withErrors([
+                'cantidad_vendida' => 'La cantidad vendida no puede ser mayor que la cantidad disponible editable de la cosecha.'
+            ]);
+        }
+
+        try {
+            DB::transaction(function () use ($request, $factura, $cosecha, $cantidadVendidaNueva, $cantidadVendidaActual) {
+                $rutaArchivo = $factura->archivo;
+
+                if ($request->hasFile('archivo')) {
+                    $rutaArchivo = $request->file('archivo')->store('facturas_cosechas', 'public');
+                }
+
+                $precioUnitario = (float) $request->precio_unitario;
+                $nuevaDisponible = ((float) $cosecha->cantidad_disponible + $cantidadVendidaActual) - $cantidadVendidaNueva;
+
+                $factura->update([
+                    'numero_factura' => $request->numero_factura,
+                    'cliente' => $request->cliente,
+                    'fecha_factura' => $request->fecha_factura,
+                    'cantidad_vendida' => $cantidadVendidaNueva,
+                    'precio_unitario' => $precioUnitario,
+                    'total' => $cantidadVendidaNueva * $precioUnitario,
+                    'archivo' => $rutaArchivo,
+                    'observaciones' => $request->observaciones,
+                    'updated_by' => Auth::id(),
+                ]);
+
+                $cosecha->update([
+                    'cantidad_disponible' => max($nuevaDisponible, 0),
+                    'updated_by' => Auth::id(),
+                ]);
+            });
+
+            return redirect()->route('cosecha.facturas', $cosecha)->with('success', 'Factura actualizada correctamente.');
+        } catch (\Throwable $error) {
+            return back()->withInput()->with('error', $error->getMessage() ?: 'No se pudo actualizar la factura.');
+        }
+    }
+
+    public function registrarDescarte(Request $request, Cosecha $cosecha)
+    {
+        $request->validate([
+            'cantidad_descarte' => 'required|numeric|min:0.01',
+            'motivo_descarte' => 'required|string|max:255',
+        ]);
+
+        $cantidadDescarte = (float) $request->cantidad_descarte;
+        $cantidadDisponible = (float) $cosecha->cantidad_disponible;
+
+        if ($cantidadDescarte > $cantidadDisponible) {
+            return back()
+                ->withInput()
+                ->withErrors(['cantidad_descarte' => 'La baja por descarte no puede ser mayor que la cantidad disponible de la cosecha.']);
+        }
+
+        try {
+            DB::transaction(function () use ($cosecha, $cantidadDescarte, $request) {
+                $columns = $this->getCosechasColumns();
+                $descarteActual = (float) ($cosecha->descarte ?? 0);
+                $cantidadDescarteActual = (float) ($cosecha->cantidad_descarte ?? 0);
+                $cantidadNetaActual = (float) ($cosecha->cantidad_neta ?? 0);
+                $motivo = trim((string) $request->motivo_descarte);
+
+                $payload = [
+                    'cantidad_disponible' => max($cantidadNetaActual - $cantidadDescarte - ((float) $cosecha->facturas()->sum('cantidad_vendida')), 0),
+                    'cantidad_neta' => max($cantidadNetaActual - $cantidadDescarte, 0),
+                    'descarte' => $descarteActual + $cantidadDescarte,
+                    'cantidad_descarte' => $cantidadDescarteActual + $cantidadDescarte,
+                    'motivo_descarte' => $motivo,
+                    'updated_by' => Auth::id(),
+                ];
+
+                $cosecha->update(array_intersect_key($payload, array_flip($columns)));
+            });
+
+            return redirect()
+                ->route('cosecha.descarte', $cosecha)
+                ->with('success', 'Baja por descarte registrada correctamente.');
+        } catch (\Throwable $error) {
+            return back()
+                ->withInput()
+                ->with('error', $error->getMessage() ?: 'No se pudo registrar la baja por descarte.');
         }
     }
 
@@ -282,14 +490,12 @@ class CosechaController extends Controller
 
     private function resolverLogoEmpresa(?Empresa $empresa): ?string
     {
-        if (!$empresa || empty($empresa->logo)) {
-            return null;
-        }
-
         $rutas = [
-            $empresa->logo,
-            ltrim(str_replace('storage/', '', $empresa->logo), '/'),
-            'logos/' . ltrim(basename($empresa->logo), '/'),
+            $empresa?->logo,
+            $empresa ? ltrim(str_replace('storage/', '', (string) $empresa->logo), '/') : null,
+            $empresa && !empty($empresa->logo) ? 'logos/' . ltrim(basename((string) $empresa->logo), '/') : null,
+            'NiceAdmin/assets/img/agrocontrol.png',
+            'NiceAdmin/assets/img/logo.png',
         ];
 
         foreach (array_unique($rutas) as $ruta) {

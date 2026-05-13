@@ -2,16 +2,17 @@
 
 namespace App\Traits;
 
+use App\Support\SchemaCache;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Schema;
 
-/** @mixin Model */
+/**
+ * @mixin Model
+ * @method static void deleting(callable $callback)
+ */
 trait TracksDeletionMetadata
 {
-    abstract public static function deleting($callback);
-
     public static function bootTracksDeletionMetadata(): void
     {
         static::deleting(function ($model): void {
@@ -22,13 +23,13 @@ trait TracksDeletionMetadata
             $table = $model->getTable();
             $dirty = false;
 
-            if (Schema::hasColumn($table, 'deleted_by') && empty($model->getAttribute('deleted_by'))) {
+            if (SchemaCache::hasColumn($table, 'deleted_by') && empty($model->getAttribute('deleted_by'))) {
                 $model->setAttribute('deleted_by', Auth::id());
                 $dirty = true;
             }
 
             $reason = trim((string) (request()->input('delete_reason') ?: request()->header('X-Delete-Reason') ?: ''));
-            if (Schema::hasColumn($table, 'delete_reason') && $reason !== '' && blank($model->getAttribute('delete_reason'))) {
+            if (SchemaCache::hasColumn($table, 'delete_reason') && $reason !== '' && blank($model->getAttribute('delete_reason'))) {
                 $model->setAttribute('delete_reason', $reason);
                 $dirty = true;
             }

@@ -1,3 +1,8 @@
+@php
+    $renderInModal = $renderInModal ?? true;
+@endphp
+
+@if($renderInModal)
 <div class="modal-header border-0 text-white" style="background: linear-gradient(135deg, #0f5132 0%, #198754 55%, #44a96f 100%);">
     <div>
         <h5 class="modal-title mb-1">Ventas Facturadas de la Cosecha</h5>
@@ -7,8 +12,24 @@
 </div>
 
 <div class="modal-body">
+@else
+<main id="main" class="main">
+    <div class="pagetitle d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div>
+            <h1>Factura de Cosecha</h1>
+            <p class="mb-0 text-muted">Registro de ventas y control del saldo cosechado.</p>
+        </div>
+        <a href="{{ route('cosecha.facturadas.index') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="fa-solid fa-arrow-left me-1"></i> Volver a facturadas
+        </a>
+    </div>
+
+    <section class="section">
+        <div class="card">
+            <div class="card-body pt-4">
+@endif
     @php
-        $facturasOrdenadas = $cosecha->facturas->sortByDesc('fecha_factura')->values();
+        $facturasOrdenadas = $cosecha->facturas->values();
         $totalFacturado = $facturasOrdenadas->sum('total');
         $cantidadVendida = $facturasOrdenadas->sum('cantidad_vendida');
     @endphp
@@ -33,9 +54,7 @@
                 </div>
             </div>
             <div class="col-md-4 text-md-end">
-                @if(!empty($empresa?->logo))
-                    <img src="{{ asset('storage/' . $empresa->logo) }}" alt="Logo empresa" class="factura-logo-preview">
-                @endif
+                <img src="{{ $logoEmpresa }}" alt="Logo empresa" class="factura-logo-preview">
             </div>
         </div>
     </div>
@@ -159,6 +178,7 @@
                     <th>Registro</th>
                     <th>Archivo</th>
                     <th>Exportar</th>
+                    <th>Accion</th>
                     <th></th>
                 </tr>
             </thead>
@@ -192,8 +212,11 @@
                         <td>
                             @if($factura->archivo)
                                 <a href="{{ asset('storage/' . $factura->archivo) }}" target="_blank"
-                                   class="btn btn-outline-secondary btn-sm">
-                                    <i class="fa fa-paperclip"></i>
+                                   class="btn btn-outline-secondary btn-sm"
+                                   title="Ver archivo adjunto de la factura"
+                                   aria-label="Ver archivo adjunto de la factura">
+                                    <i class="fa fa-paperclip me-1"></i>
+                                    <span class="d-none d-md-inline">Archivo</span>
                                 </a>
                             @else
                                 -
@@ -207,9 +230,13 @@
                         </td>
 
                         <td>
+                            <a href="{{ route('cosecha.facturas.edit', $factura) }}" class="btn btn-outline-warning btn-sm me-1" title="Editar factura">
+                                <i class="fa fa-pen"></i>
+                            </a>
                             <button type="button"
-                                    class="btn btn-outline-danger btn-sm btnEliminarFacturaVenta"
+                                    class="btn btn-outline-danger btn-sm btnAnularFacturaVenta"
                                     data-id="{{ $factura->id }}"
+                                    data-url="{{ route('cosecha.facturas.destroy', $factura) }}"
                                     data-cosecha="{{ $cosecha->id }}">
                                 <i class="fa fa-trash"></i>
                             </button>
@@ -227,7 +254,14 @@
         </table>
     </div>
 
+@if($renderInModal)
 </div>
+@else
+            </div>
+        </div>
+    </section>
+</main>
+@endif
 
 <!-- =========================
      JS TOTAL AUTOMÁTICO
@@ -298,6 +332,20 @@ function formatearNumero(valor) {
     }).format(valor);
 }
 
+function mostrarErrorFacturaVenta(error) {
+    if (error && error.errors) {
+        let mensajes = '<ul style="text-align:left; margin:0; padding-left:18px;">';
+        Object.values(error.errors).flat().forEach(msg => {
+            mensajes += `<li>${msg}</li>`;
+        });
+        mensajes += '</ul>';
+        Swal.fire({ title: 'Error', html: mensajes, icon: 'error' });
+        return;
+    }
+
+    Swal.fire('Error', error?.message || 'No se pudo completar la operación.', 'error');
+}
+
 function calcularTotal() {
     const cantidadInput = document.getElementById('cantidad_vendida');
     const precioInput = document.getElementById('precio_unitario');
@@ -318,4 +366,53 @@ function calcularTotal() {
 document.getElementById('cantidad_vendida')?.addEventListener('input', calcularTotal);
 document.getElementById('precio_unitario')?.addEventListener('input', calcularTotal);
 calcularTotal();
+
+document.addEventListener('click', function (event) {
+    const button = event.target.closest('.btnAnularFacturaVenta');
+    if (!button) {
+        return;
+    }
+
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+    Swal.fire({
+        title: 'Anular venta',
+        text: 'La cantidad vendida volverá al saldo disponible de la cosecha.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Sí, anular venta',
+        cancelButtonText: 'Cancelar'
+    }).then((result) => {
+        if (!result.isConfirmed) {
+            return;
+        }
+
+        fetch(button.dataset.url, {
+            method: 'DELETE',
+            credentials: 'same-origin',
+            headers: {
+                'X-CSRF-TOKEN': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        })
+            .then(async (response) => {
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw data;
+                }
+
+                return data;
+            })
+            .then((data) => {
+                Swal.fire('Éxito', data.success || 'Venta anulada correctamente.', 'success')
+                    .then(() => {
+                        window.location.reload();
+                    });
+            })
+            .catch(mostrarErrorFacturaVenta);
+    });
+});
 </script>

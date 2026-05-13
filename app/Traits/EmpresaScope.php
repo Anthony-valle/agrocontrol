@@ -2,10 +2,10 @@
 
 namespace App\Traits;
 
+use App\Support\SchemaCache;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Schema;
 
 /** @mixin Model */
 trait EmpresaScope
@@ -27,7 +27,7 @@ trait EmpresaScope
             $user = Auth::user();
             $empresaId = $user->sucursal->empresa_id ?? $user->empresa_id ?? null;
 
-            if ($empresaId && Schema::hasColumn($table, 'empresa_id')) {
+            if ($empresaId && SchemaCache::hasColumn($table, 'empresa_id')) {
                 $builder->where($table . '.empresa_id', $empresaId);
             }
 
@@ -36,7 +36,7 @@ trait EmpresaScope
                 return;
             }
 
-            if (Schema::hasColumn($table, 'sucursal_id')) {
+            if (SchemaCache::hasColumn($table, 'sucursal_id')) {
                 $sucursalId = $user->sucursal_id ?? $user->sucursal->id ?? null;
                 if ($sucursalId) {
                     $builder->where($table . '.sucursal_id', $sucursalId);

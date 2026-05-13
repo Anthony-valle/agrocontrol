@@ -149,11 +149,14 @@ Route::middleware(['auth', AuditUserAction::class])->group(function () {
         ->middlewareFor(['destroy'], 'sensitive.actions');
     Route::get('/cosecha/facturadas', [CosechaController::class, 'facturadasIndex'])->name('cosecha.facturadas.index');
     Route::get('/cosecha/{cosecha}/facturas', [CosechaController::class, 'facturas'])->name('cosecha.facturas');
+    Route::get('/cosecha/{cosecha}/descarte', [CosechaController::class, 'descarte'])->name('cosecha.descarte');
+    Route::get('/cosecha/facturas/{factura}/editar', [CosechaController::class, 'editFactura'])->name('cosecha.facturas.edit');
     Route::post('/cosecha/{cosecha}/facturas', [CosechaController::class, 'storeFactura'])
-        ->middleware('sensitive.actions')
         ->name('cosecha.facturas.store');
+    Route::put('/cosecha/facturas/{factura}', [CosechaController::class, 'updateFactura'])->name('cosecha.facturas.update');
+    Route::post('/cosecha/{cosecha}/descarte', [CosechaController::class, 'registrarDescarte'])
+        ->name('cosecha.descarte.store');
     Route::delete('/cosecha/facturas/{factura}', [CosechaController::class, 'destroyFactura'])
-        ->middleware('sensitive.actions')
         ->name('cosecha.facturas.destroy');
     Route::get('/cosecha/facturas/{factura}/exportar', [CosechaController::class, 'exportFactura'])->name('cosecha.facturas.export');
     Route::get('/cultivo/unidad/{id}', [CosechaController::class, 'getUnidad']);

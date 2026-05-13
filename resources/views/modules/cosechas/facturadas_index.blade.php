@@ -84,6 +84,7 @@
                                         <th>Ingreso</th>
                                         <th>Facturado</th>
                                         <th>Estado Venta</th>
+                                        <th>Descarte</th>
                                         <th>Observación</th>
                                         <th>Registrado por</th>
                                         <th>Acción</th>
@@ -96,6 +97,23 @@
                                         $cantidadDisponible = (float) $item->cantidad_disponible;
                                         $cantidadVendida = max($cantidadNeta - $cantidadDisponible, 0);
                                         $porcentajeVendido = $cantidadNeta > 0 ? ($cantidadVendida / $cantidadNeta) * 100 : 0;
+                                        $descarteAcumulado = max(
+                                            (float) ($item->cantidad_descarte ?? 0),
+                                            (float) ($item->descarte ?? 0)
+                                        );
+                                        $motivoDescarte = trim((string) ($item->motivo_descarte ?? ''));
+                                        $observacion = trim((string) ($item->observaciones ?? ''));
+
+                                        if ($descarteAcumulado <= 0 && preg_match('/Baja por descarte:\s*([\d.,]+)/u', $observacion, $descarteCoincide) === 1) {
+                                            $descarteAcumulado = (float) str_replace(',', '', $descarteCoincide[1]);
+                                        }
+
+                                        if ($motivoDescarte === '' && preg_match('/Motivo:\s*(.+)$/u', $observacion, $motivoCoincide) === 1) {
+                                            $motivoDescarte = trim($motivoCoincide[1]);
+                                        }
+
+                                        $observacionLimpia = preg_replace('/\s*Baja por descarte:.*$/u', '', $observacion) ?? $observacion;
+                                        $observacionLimpia = trim($observacionLimpia);
 
                                         if ($cantidadVendida <= 0) {
                                             $estadoVenta = 'Sin vender';
@@ -122,12 +140,23 @@
                                             <span class="badge {{ $estadoClase }}">{{ $estadoVenta }}</span>
                                             <div class="small text-muted mt-1">{{ agro_number($porcentajeVendido, 1, '.', ',') }}% vendido</div>
                                         </td>
-                                        <td>{{ $item->observaciones ?? '-' }}</td>
+                                        <td>
+                                            @if($descarteAcumulado > 0)
+                                                <div class="fw-semibold text-warning-emphasis">{{ agro_number($descarteAcumulado, 2, '.', ',') }} {{ $item->unidad_medida }}</div>
+                                                <div class="small text-muted">{{ $motivoDescarte !== '' ? $motivoDescarte : 'Sin motivo registrado' }}</div>
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
+                                        <td>{{ $observacionLimpia !== '' ? $observacionLimpia : '-' }}</td>
                                         <td>{{ $item->usuario->usuario ?? 'Sistema' }}</td>
-                                        <td class="text-nowrap">
-                                            <button class="btn btn-success btn-sm btnFacturas" data-id="{{ $item->id }}" title="Facturar cosecha">
-                                                <i class="fa fa-file-invoice-dollar"></i>
-                                            </button>
+                                        <td class="text-nowrap d-flex flex-wrap gap-2">
+                                            <a href="{{ route('cosecha.facturas', $item) }}" class="btn btn-success btn-sm" title="Facturar cosecha">
+                                                <i class="fa fa-file-invoice-dollar me-1"></i> Facturar
+                                            </a>
+                                            <a href="{{ route('cosecha.descarte', $item) }}" class="btn btn-outline-warning btn-sm" title="Dar de baja por descarte">
+                                                <i class="fa-solid fa-triangle-exclamation me-1"></i> Descarte
+                                            </a>
                                         </td>
                                     </tr>
                                     @endforeach
@@ -142,102 +171,12 @@
 
 </main>
 
-<div class="modal fade" id="modalFacturas" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content" id="modalContentFacturas"></div>
-    </div>
-</div>
-
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const tabla = document.getElementById('tablaVentasCosecha');
     const filas = tabla && tabla.tBodies.length ? Array.from(tabla.tBodies[0].rows) : [];
     const inputBusqueda = document.getElementById('inputBusquedaVentas');
     const perPageSelect = document.getElementById('customPerPageVentas');
-    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-    const modalFacturas = document.getElementById('modalFacturas');
-
-    function mostrarErrores(error) {
-        if (error && error.errors) {
-            let mensajes = '<ul style="text-align:left; margin:0; padding-left:18px;">';
-            Object.values(error.errors).flat().forEach(msg => {
-                mensajes += `<li>${msg}</li>`;
-            });
-            mensajes += '</ul>';
-            Swal.fire({ title: 'Error de validación', html: mensajes, icon: 'error' });
-            return;
-        }
-
-        Swal.fire('Error', error?.message || 'No se pudo procesar la solicitud.', 'error');
-    }
-
-    function bindAjaxForm(modalId, contentId, successMessage) {
-        const modalElement = document.getElementById(modalId);
-        const form = document.getElementById(contentId)?.querySelector('form');
-        if (!form || form.dataset.ajaxBound === 'true') {
-            return;
-        }
-
-        form.dataset.ajaxBound = 'true';
-        form.addEventListener('submit', function (e) {
-            e.preventDefault();
-            const formData = new FormData(form);
-
-            fetch(form.action, {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-CSRF-TOKEN': csrfToken,
-                    'Accept': 'application/json'
-                }
-            })
-                .then(async response => {
-                    const data = await response.json().catch(() => ({}));
-                    if (!response.ok) {
-                        throw data;
-                    }
-                    return data;
-                })
-                .then(data => {
-                    Swal.fire('Éxito', data.success || successMessage, 'success').then(() => {
-                        bootstrap.Modal.getInstance(modalElement)?.hide();
-                        location.reload();
-                    });
-                })
-                .catch(mostrarErrores);
-        });
-    }
-
-    function inicializarFormularioFacturaCosecha() {
-        const cantidadInput = document.getElementById('cantidad_vendida');
-        const precioInput = document.getElementById('precio_unitario');
-        const totalInput = document.getElementById('total_factura');
-
-        if (!cantidadInput || !precioInput || !totalInput) {
-            return;
-        }
-
-        const actualizarTotal = () => {
-            const cantidad = parseFloat(cantidadInput.value) || 0;
-            const precio = parseFloat(precioInput.value) || 0;
-            totalInput.value = (cantidad * precio).toFixed(2);
-        };
-
-        cantidadInput.addEventListener('input', actualizarTotal);
-        precioInput.addEventListener('input', actualizarTotal);
-        actualizarTotal();
-    }
-
-    function cargarFacturasCosecha(cosechaId) {
-        fetch(`/cosecha/${cosechaId}/facturas`)
-            .then(res => res.text())
-            .then(html => {
-                document.getElementById('modalContentFacturas').innerHTML = html;
-                inicializarFormularioFacturaCosecha();
-                bindAjaxForm('modalFacturas', 'modalContentFacturas', 'Factura registrada correctamente');
-                bootstrap.Modal.getOrCreateInstance(modalFacturas).show();
-            });
-    }
 
     function mostrarFilas(filasVisibles) {
         filas.forEach((fila) => {
@@ -265,14 +204,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     filtrarTabla();
-
-    document.addEventListener('click', function (event) {
-        const facturarButton = event.target.closest('.btnFacturas');
-        if (facturarButton) {
-            cargarFacturasCosecha(facturarButton.dataset.id);
-            return;
-        }
-    });
 });
 </script>
 @endsection

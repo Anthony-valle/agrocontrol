@@ -12,6 +12,8 @@ class User extends Authenticatable
 {
     use Notifiable, SoftDeletes, TracksDeletionMetadata;
 
+    private ?string $imagenUsuarioUrlCache = null;
+
     private const SUPER_USER_ROLES = [
         'admin',
         'administrador',
@@ -87,11 +89,15 @@ class User extends Authenticatable
 
     public function getImagenUsuarioUrlAttribute(): string
     {
+        if ($this->imagenUsuarioUrlCache !== null) {
+            return $this->imagenUsuarioUrlCache;
+        }
+
         $imagen = trim((string) ($this->attributes['imagen_usuario'] ?? ''));
         $fallback = asset('NiceAdmin/assets/img/default-user-avatar.svg');
 
         if ($imagen === '') {
-            return $fallback;
+            return $this->imagenUsuarioUrlCache = $fallback;
         }
 
         $rutaNormalizada = ltrim(str_replace('storage/', '', $imagen), '/');
@@ -101,18 +107,18 @@ class User extends Authenticatable
             $mimeType = mime_content_type($rutaAbsoluta) ?: 'image/png';
             $contenido = base64_encode(file_get_contents($rutaAbsoluta));
 
-            return 'data:' . $mimeType . ';base64,' . $contenido;
+            return $this->imagenUsuarioUrlCache = 'data:' . $mimeType . ';base64,' . $contenido;
         }
 
         if (file_exists(public_path($imagen))) {
-            return asset($imagen);
+            return $this->imagenUsuarioUrlCache = asset($imagen);
         }
 
         if (file_exists(public_path('storage/' . $rutaNormalizada))) {
-            return asset('storage/' . $rutaNormalizada);
+            return $this->imagenUsuarioUrlCache = asset('storage/' . $rutaNormalizada);
         }
 
-        return $fallback;
+        return $this->imagenUsuarioUrlCache = $fallback;
     }
 
     // Relaciones
