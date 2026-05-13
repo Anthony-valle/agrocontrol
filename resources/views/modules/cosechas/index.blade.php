@@ -42,7 +42,7 @@
                             <!-- BOTÓN -->
                             <div class="d-flex flex-wrap gap-2 justify-content-end">
                                 <a href="{{ route('cosecha.facturadas.index') }}" class="btn btn-outline-success btn-sm">
-                                    <i class="fa-solid fa-file-invoice-dollar me-1"></i> Ventas facturadas
+                                    <i class="fa-solid fa-file-invoice-dollar me-1"></i> Ir a facturacion
                                 </a>
                                 <button type="button" class="btn btn-primary btn-sm" id="btnAbrirModal">
                                     <i class="fa fa-plus me-1"></i> Nueva Cosecha
@@ -62,10 +62,6 @@
                                         <th>Cantidad</th>
                                         <th>Disponible</th>
                                         <th>Unidad</th>
-                                        <th>Precio</th>
-                                        <th>Ingreso</th>
-                                        <th>Facturado</th>
-                                        <th>Estado Venta</th>
                                         <th>Observación</th>
                                         <th>Registrado por</th>
                                         <th>Acción</th>
@@ -73,23 +69,6 @@
                                 </thead>
                                 <tbody>
                                     @foreach ($cosechas as $item)
-                                    @php
-                                        $cantidadNeta = (float) $item->cantidad_neta;
-                                        $cantidadDisponible = (float) $item->cantidad_disponible;
-                                        $cantidadVendida = max($cantidadNeta - $cantidadDisponible, 0);
-                                        $porcentajeVendido = $cantidadNeta > 0 ? ($cantidadVendida / $cantidadNeta) * 100 : 0;
-
-                                        if ($cantidadVendida <= 0) {
-                                            $estadoVenta = 'Sin vender';
-                                            $estadoClase = 'bg-secondary';
-                                        } elseif ($cantidadDisponible <= 0.0001) {
-                                            $estadoVenta = 'Vendida';
-                                            $estadoClase = 'bg-success';
-                                        } else {
-                                            $estadoVenta = 'Parcial';
-                                            $estadoClase = 'bg-warning text-dark';
-                                        }
-                                    @endphp
                                     <tr>
                                         <td>{{ $item->id }}</td>
                                         <td>{{ $item->cultivo->nombre }}</td>
@@ -97,13 +76,6 @@
                                         <td>{{ agro_number($item->cantidad_neta, 2, '.', ',') }}</td>
                                         <td>{{ agro_number($item->cantidad_disponible, 2, '.', ',') }}</td>
                                         <td>{{ $item->unidad_medida }}</td>
-                                        <td>{{ $item->precio_venta_unitario !== null ? agro_number($item->precio_venta_unitario, 2, '.', ',') . ' Lps' : 'N/D' }}</td>
-                                        <td>{{ $item->precio_venta_unitario !== null ? agro_number($item->cantidad_neta * $item->precio_venta_unitario, 2, '.', ',') . ' Lps' : 'N/D' }}</td>
-                                        <td>{{ $item->facturas_sum_total !== null ? agro_number($item->facturas_sum_total, 2, '.', ',') . ' Lps' : '0.00 Lps' }}</td>
-                                        <td>
-                                            <span class="badge {{ $estadoClase }}">{{ $estadoVenta }}</span>
-                                            <div class="small text-muted mt-1">{{ agro_number($porcentajeVendido, 1, '.', ',') }}% vendido</div>
-                                        </td>
                                         <td>{{ $item->observaciones ?? '-' }}</td>
                                         <td>{{ $item->usuario->usuario ?? 'Sistema' }}</td>
                                         <td class="text-nowrap">

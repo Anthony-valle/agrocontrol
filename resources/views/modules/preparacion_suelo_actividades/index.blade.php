@@ -16,7 +16,7 @@
                         <h5 class="card-title pb-0">Catálogo de Actividades</h5>
 
                         <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 p-2 bg-light rounded shadow-sm gap-3">
-                            <div class="d-flex align-items-center gap-3 flex-wrap">
+                            <div class="d-flex flex-wrap flex-md-nowrap align-items-center gap-3">
                                 <div class="d-flex align-items-center gap-2">
                                     <select id="customPerPage" class="form-select form-select-sm" style="width: auto;">
                                         <option value="5">5</option>
@@ -72,7 +72,11 @@
                                             <td>{{ $item->actividad_secundaria }}</td>
                                             <td>{{ $item->unidad_medida }}</td>
                                             <td>{{ Str::limit($item->observaciones, 40) }}</td>
-                                            <td>{{ $item->estado ? 'Activo' : 'Inactivo' }}</td>
+                                            <td>
+                                                <span class="badge rounded-pill {{ $item->estado ? 'bg-success' : 'bg-secondary' }}">
+                                                    {{ $item->estado ? 'Activo' : 'Inactivo' }}
+                                                </span>
+                                            </td>
                                             <td class="text-center text-nowrap">
                                                 <button class="btn btn-warning btn-sm btnEditarActividad" data-id="{{ $item->id }}">
                                                     <i class="fa-solid fa-pen-to-square"></i>

@@ -26,31 +26,35 @@
 
 
             <!-- CONTROLES -->
-            <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 p-2 bg-light rounded shadow-sm gap-3">
+            <form method="GET" action="{{ route('inventarios.index') }}" class="d-flex flex-wrap justify-content-between align-items-center mb-3 p-2 bg-light rounded shadow-sm gap-3">
 
                 <div class="d-flex align-items-center gap-3">
 
-                    <!-- REGISTROS -->
                     <div class="d-flex align-items-center gap-2">
-                        <select id="customPerPage" class="form-select form-select-sm" style="width:auto;">
-                            <option value="5">5</option>
-                            <option value="10" selected>10</option>
-                            <option value="20">20</option>
-                            <option value="50">50</option>
+                        <select id="customPerPage" name="per_page" class="form-select form-select-sm" style="width:auto;">
+                            <option value="5" {{ (int) $perPage === 5 ? 'selected' : '' }}>5</option>
+                            <option value="10" {{ (int) $perPage === 10 ? 'selected' : '' }}>10</option>
+                            <option value="20" {{ (int) $perPage === 20 ? 'selected' : '' }}>20</option>
+                            <option value="50" {{ (int) $perPage === 50 ? 'selected' : '' }}>50</option>
                         </select>
                         <small class="text-muted">registros</small>
                     </div>
 
-                    <!-- BUSCADOR -->
                     <div class="input-group input-group-sm">
                         <span class="input-group-text bg-white">
                             <i class="fa-solid fa-magnifying-glass text-muted"></i>
                         </span>
-                        <input type="text" id="inputBusqueda" class="form-control" placeholder="Buscar insumo...">
+                        <input
+                            type="text"
+                            id="inputBusqueda"
+                            name="q"
+                            class="form-control"
+                            placeholder="Buscar insumo, codigo o bodega..."
+                            value="{{ $search }}"
+                        >
                     </div>
 
-                    <!-- FILTRO BODEGA -->
-                    <select id="filtroBodega" class="form-select form-select-sm">
+                    <select id="filtroBodega" name="bodega_id" class="form-select form-select-sm">
                         <option value="">Todas las bodegas</option>
                         @foreach($bodegas as $b)
                             <option value="{{ $b->id }}"
@@ -59,6 +63,10 @@
                             </option>
                         @endforeach
                     </select>
+
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="fa-solid fa-filter me-1"></i> 
+                    </button>
 
                 </div>
 
@@ -70,7 +78,7 @@
                         <i class="bi bi-file-earmark-pdf me-1"></i> PDF
                     </a>
                 </div>
-            </div>
+            </form>
 
 
             <!-- TABLA -->
@@ -99,7 +107,7 @@
 
                         <tr>
 
-                            <td>{{ $loop->iteration }}</td>
+                            <td>{{ $inventarios->firstItem() + $loop->index }}</td>
                             <td>{{ $item->insumo->codigo ?? '-' }}</td>
                             <td>{{ $item->insumo->nombre ?? '-' }}</td>
                             <td>{{ $item->categoria_resuelta ?? '-' }}</td>
@@ -138,6 +146,47 @@
 
             </div>
 
+            <div class="d-flex flex-wrap justify-content-between align-items-center mt-3 gap-2" id="inventarioPaginacionWrap">
+                <small class="text-muted">
+                    @if($inventarios->total() > 0)
+                        Mostrando {{ $inventarios->firstItem() }}-{{ $inventarios->lastItem() }} de {{ $inventarios->total() }} registros | Hoja {{ $inventarios->currentPage() }} de {{ $inventarios->lastPage() }}
+                    @else
+                        No hay registros para mostrar.
+                    @endif
+                </small>
+
+                @if($inventarios->lastPage() > 1)
+                    @php
+                        $maxPaginasVisibles = 6;
+                        $paginaActual = $inventarios->currentPage();
+                        $ultimaPagina = $inventarios->lastPage();
+                        $inicioPagina = max(1, $paginaActual - intdiv($maxPaginasVisibles - 1, 2));
+                        $finPagina = min($ultimaPagina, $inicioPagina + $maxPaginasVisibles - 1);
+
+                        if (($finPagina - $inicioPagina + 1) < $maxPaginasVisibles) {
+                            $inicioPagina = max(1, $finPagina - $maxPaginasVisibles + 1);
+                        }
+                    @endphp
+                    <nav aria-label="Paginacion de inventario">
+                        <ul class="pagination pagination-sm mb-0">
+                            <li class="page-item {{ $inventarios->onFirstPage() ? 'disabled' : '' }}">
+                                <a class="page-link" href="{{ $inventarios->onFirstPage() ? '#' : $inventarios->previousPageUrl() }}">Anterior</a>
+                            </li>
+
+                            @for($page = $inicioPagina; $page <= $finPagina; $page++)
+                                <li class="page-item {{ $page === $inventarios->currentPage() ? 'active' : '' }}">
+                                    <a class="page-link" href="{{ $inventarios->url($page) }}">{{ $page }}</a>
+                                </li>
+                            @endfor
+
+                            <li class="page-item {{ $inventarios->hasMorePages() ? '' : 'disabled' }}">
+                                <a class="page-link" href="{{ $inventarios->hasMorePages() ? $inventarios->nextPageUrl() : '#' }}">Siguiente</a>
+                            </li>
+                        </ul>
+                    </nav>
+                @endif
+            </div>
+
         </div>
 
     </div>
@@ -146,48 +195,12 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-
-    const tabla = document.getElementById("tablaInventario");
-    const filas = Array.from(tabla.tBodies[0].rows);
-    const inputBusqueda = document.getElementById("inputBusqueda");
     const perPageSelect = document.getElementById("customPerPage");
+    const filtroBodega = document.getElementById("filtroBodega");
+    const formulario = perPageSelect?.closest("form");
 
-    function mostrarFilas(filasVisibles){
-        filas.forEach(f => f.style.display = "none");
-        filasVisibles.forEach(f => f.style.display = "");
-    }
-
-    function filtrarTabla(){
-        const texto = inputBusqueda.value.toLowerCase();
-
-        const filtradas = filas.filter(f =>
-            Array.from(f.cells).some(c =>
-                c.textContent.toLowerCase().includes(texto)
-            )
-        );
-
-        mostrarFilas(filtradas.slice(0, parseInt(perPageSelect.value)));
-    }
-
-    inputBusqueda.addEventListener("input", filtrarTabla);
-    perPageSelect.addEventListener("change", filtrarTabla);
-
-    mostrarFilas(filas.slice(0, parseInt(perPageSelect.value)));
-
-    // FILTRO BODEGA
-    document.getElementById("filtroBodega").addEventListener("change", function(){
-
-        let bodega = this.value;
-        let url = new URL(window.location.href);
-
-        if(bodega){
-            url.searchParams.set("bodega_id", bodega);
-        }else{
-            url.searchParams.delete("bodega_id");
-        }
-
-        window.location.href = url;
-    });
+    perPageSelect?.addEventListener("change", () => formulario?.submit());
+    filtroBodega?.addEventListener("change", () => formulario?.submit());
 
 });
 </script>

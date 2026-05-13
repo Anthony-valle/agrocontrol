@@ -1,0 +1,18 @@
+[Unit]
+Description=AgroControl Laravel queue worker
+After=network.target redis.service mariadb.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+Restart=always
+RestartSec=5
+WorkingDirectory=/var/www/agrocontrol
+ExecStart=/usr/bin/php /var/www/agrocontrol/artisan queue:work redis --queue=default --sleep=1 --tries=3 --timeout=120 --max-time=3600
+ExecReload=/usr/bin/php /var/www/agrocontrol/artisan queue:restart
+KillSignal=SIGTERM
+TimeoutStopSec=180
+
+[Install]
+WantedBy=multi-user.target

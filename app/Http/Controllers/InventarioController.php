@@ -16,8 +16,13 @@ class InventarioController extends Controller
     public function index(Request $request)
     {
         $sucursalId = Auth::user()->sucursal_id;
-
+        $search = trim((string) $request->query('q', ''));
         $bodegaId = $request->bodega_id;
+        $perPage = (int) $request->query('per_page', 10);
+
+        if (! in_array($perPage, [5, 10, 20, 50], true)) {
+            $perPage = 10;
+        }
 
         $bodegas = Bodega::where('sucursal_id',$sucursalId)->get();
 
@@ -29,9 +34,21 @@ class InventarioController extends Controller
             ->when($bodegaId,function($q) use ($bodegaId){
                 $q->where('bodega_id',$bodegaId);
             })
-            ->get();
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($subQuery) use ($search) {
+                    $subQuery->whereHas('insumo', function ($insumoQuery) use ($search) {
+                        $insumoQuery->where('nombre', 'like', "%{$search}%")
+                            ->orWhere('codigo', 'like', "%{$search}%");
+                    })->orWhereHas('bodega', function ($bodegaQuery) use ($search) {
+                        $bodegaQuery->where('nombre', 'like', "%{$search}%");
+                    });
+                });
+            })
+            ->orderBy('insumo_id')
+            ->paginate($perPage)
+            ->withQueryString();
 
-        $inventarios->each(function ($item) {
+        $inventarios->getCollection()->each(function ($item) {
             $item->categoria_resuelta = $this->resolverCategoriaNombre($item->insumo);
         });
 
@@ -42,7 +59,9 @@ class InventarioController extends Controller
             
             'bodegas',
             'titulo',
-            'bodegaId'
+            'bodegaId',
+            'search',
+            'perPage'
         ));
     }
 

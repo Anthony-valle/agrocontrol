@@ -65,6 +65,23 @@
             white-space: nowrap;
         }
 
+        .categoria-comparison-button {
+            display: inline-block;
+            border: 0;
+            background: transparent;
+            color: #16624f;
+            font-weight: 700;
+            padding: 0;
+            text-align: left;
+            text-decoration: none;
+        }
+
+        .categoria-comparison-button:hover,
+        .categoria-comparison-button.is-active {
+            color: #0f5132;
+            text-decoration: underline;
+        }
+
         @media print {
             .report-sheet.is-hidden {
                 display: block !important;
@@ -238,7 +255,12 @@
                                             $diffColorClass = $comparacion['sobre_plan_costo'] ? 'text-danger fw-bold' : 'text-primary fw-semibold';
                                         @endphp
                                         <tr>
-                                            <td>{{ $categoria }}</td>
+                                            <td>
+                                                <a
+                                                    class="categoria-comparison-button"
+                                                    href="{{ route('reporte.cultivo.categoria-detalle', $cultivo->id) }}?categoria={{ urlencode($categoria) }}"
+                                                >{{ $categoria }}</a>
+                                            </td>
                                             <td>{{ agro_number($comparacion['plan_cantidad'], 2) }}</td>
                                             <td>{{ agro_number($comparacion['real_cantidad'], 2) }}</td>
                                             <td class="{{ $realColorClass }}">{{ agro_number($comparacion['real_costo'], 2) }} Lps</td>
@@ -308,132 +330,6 @@
                                 <h4 class="fw-bold">{{ agro_number($planVsReal['rendimiento_real'], 1) }}%</h4>
                             </div>
                         </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="row mt-4">
-            <div class="col-lg-6">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-white fw-bold">Plan de Cultivo</div>
-                    <div class="card-body">
-                        @if($plan)
-                            <p><strong>Fecha del plan:</strong> {{ \Carbon\Carbon::parse($plan->fecha_plan)->format('d/m/Y') }}</p>
-                            <p><strong>Cosecha estimada:</strong> {{ agro_number($planVsReal['cosecha_esperada'], 2) }}</p>
-                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3 mb-2">
-                                <small class="text-muted">Plan filtrable por semana y paginado en 15 registros.</small>
-                                <div class="d-flex align-items-center gap-2">
-                                    <label for="planWeekFilter" class="small text-muted mb-0">Semana:</label>
-                                    <select id="planWeekFilter" class="form-select form-select-sm" style="width:auto; min-width: 140px;">
-                                        <option value="">Todas</option>
-                                        @foreach($planDetalles->pluck('semana')->filter()->unique()->sort()->values() as $semanaPlan)
-                                            <option value="{{ $semanaPlan }}">Semana {{ $semanaPlan }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                            </div>
-                            @if($planDetalles->isNotEmpty())
-                                <div class="table-responsive">
-                                    <table class="table table-sm table-bordered mb-0" id="planTable">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th>Semana</th>
-                                                <th>Categoria</th>
-                                                <th>Descripción</th>
-                                                <th>Cantidad</th>
-                                                <th>U.M.</th>
-                                                <th>Costo Unit.</th>
-                                                <th>Subtotal</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @foreach($planDetalles->sortBy([['semana', 'asc'], ['categoria', 'asc'], ['descripcion', 'asc']]) as $detalle)
-                                                <tr data-plan-row data-week="{{ $detalle->semana ?? 'Sin semana' }}">
-                                                    <td>{{ $detalle->semana }}</td>
-                                                    <td>{{ $detalle->categoria }}</td>
-                                                    <td>{{ $detalle->descripcion }}</td>
-                                                    <td>{{ agro_number($detalle->cantidad_estimada, 2) }}</td>
-                                                    <td>{{ $detalle->unidad_medida }}</td>
-                                                    <td>{{ agro_number($detalle->costo_unitario, 2) }}</td>
-                                                    <td>{{ agro_number($detalle->subtotal, 2) }}</td>
-                                                </tr>
-                                            @endforeach
-                                        </tbody>
-                                    </table>
-                                </div>
-                                <div class="report-pagination" id="planPaginationContainer">
-                                    <small class="text-muted" id="planPaginationInfo"></small>
-                                    <nav aria-label="Paginacion del plan de cultivo">
-                                        <ul class="pagination pagination-sm mb-0" id="planPaginationList"></ul>
-                                    </nav>
-                                </div>
-                            @else
-                                <div class="alert alert-warning mb-0">No hay detalles de plan registrados.</div>
-                            @endif
-                        @else
-                            <div class="alert alert-warning">No existe un plan registrado para este cultivo.</div>
-                        @endif
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-lg-6">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-white fw-bold">Consumos Reales</div>
-                    <div class="card-body">
-                        @if($consumoItems->isNotEmpty())
-                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-1 mb-2">
-                                <small class="text-muted">Hoja Registro de Consumos filtrable por semana y paginada en 15 registros.</small>
-                                <div class="d-flex align-items-center gap-2">
-                                    <label for="consumoWeekFilter" class="small text-muted mb-0">Semana:</label>
-                                    <select id="consumoWeekFilter" class="form-select form-select-sm" style="width:auto; min-width: 140px;">
-                                        <option value="">Todas</option>
-                                        @foreach($consumoItems->pluck('semana_cultivo')->filter()->unique()->sort()->values() as $semanaConsumo)
-                                            <option value="{{ $semanaConsumo }}">Semana {{ is_numeric($semanaConsumo) ? (int) $semanaConsumo : $semanaConsumo }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="table-responsive">
-                                <table class="table table-sm table-bordered mb-0" id="consumoTable">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th>Semana</th>
-                                            <th>Fecha</th>
-                                            <th>Insumo</th>
-                                            <th>Categoria</th>
-                                            <th>Descripción</th>
-                                            <th>Cantidad</th>
-                                            <th>U.M.</th>
-                                            <th>Subtotal</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach($consumoItems->sortBy([['semana_cultivo', 'asc'], ['fecha_consumo', 'asc'], ['categoria', 'asc'], ['descripcion', 'asc']]) as $item)
-                                            <tr data-consumo-row data-week="{{ $item['semana_cultivo'] ?? 'Sin semana' }}">
-                                                <td>{{ is_numeric($item['semana_cultivo']) ? (int) $item['semana_cultivo'] : $item['semana_cultivo'] }}</td>
-                                                <td>{{ \Carbon\Carbon::parse($item['fecha_consumo'])->format('d/m/Y') }}</td>
-                                                <td>{{ $item['insumo'] }}</td>
-                                                <td>{{ $item['categoria'] }}</td>
-                                                <td>{{ $item['descripcion'] }}</td>
-                                                <td>{{ agro_number($item['cantidad'], 2) }}</td>
-                                                <td>{{ $item['unidad_medida'] }}</td>
-                                                <td>{{ agro_number($item['subtotal'], 2) }}</td>
-                                            </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
-                                <div class="report-pagination" id="consumoPaginationContainer">
-                                    <small class="text-muted" id="consumoPaginationInfo"></small>
-                                    <nav aria-label="Paginacion de consumos reales">
-                                        <ul class="pagination pagination-sm mb-0" id="consumoPaginationList"></ul>
-                                    </nav>
-                                </div>
-                        @else
-                            <div class="alert alert-warning">No hay consumos vigentes registrados para este cultivo.</div>
-                        @endif
                     </div>
                 </div>
             </div>

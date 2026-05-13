@@ -7,7 +7,6 @@ use App\Models\Insumo;
 use App\Models\Categorias;
 use App\Models\Sucursale;
 use App\Models\Bodega;
-use App\Models\InventarioBodega;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;

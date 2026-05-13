@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use App\Jobs\RegistrarNotificacionesSupervision;
 use App\Traits\EmpresaScope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
 
 class Notificaciones extends Model
@@ -37,6 +39,17 @@ class Notificaciones extends Model
 
     public static function registrarParaSupervision(array $payload): void
     {
+        if (config('queue.default') !== 'sync') {
+            RegistrarNotificacionesSupervision::dispatch($payload)->afterCommit();
+
+            return;
+        }
+
+        static::persistirParaSupervision($payload);
+    }
+
+    public static function persistirParaSupervision(array $payload): void
+    {
         $empresaId = isset($payload['empresa_id']) && $payload['empresa_id'] !== null
             ? (int) $payload['empresa_id']
             : null;
@@ -59,26 +72,28 @@ class Notificaciones extends Model
             return;
         }
 
-        $destinatarios->each(function (int $userId) use ($basePayload) {
-            static::create($basePayload + ['user_id' => $userId]);
-        });
+        $timestamp = now();
+        $registros = $destinatarios
+            ->map(fn (int $userId) => $basePayload + [
+                'user_id' => $userId,
+                'created_at' => $timestamp,
+                'updated_at' => $timestamp,
+            ])
+            ->all();
+
+        DB::table((new static())->getTable())->insert($registros);
     }
 
     public static function destinatariosSupervision(?int $empresaId = null): Collection
     {
         return User::query()
-            ->with(['rol', 'sucursal'])
-            ->get()
-            ->filter(function (User $user) use ($empresaId) {
-                if (!$user->hasAnyRole(['admin', 'propietario', 'programador', 'superadmin'])) {
-                    return false;
-                }
-
-                if ($empresaId === null) {
-                    return true;
-                }
-
-                return (int) ($user->sucursal->empresa_id ?? 0) === $empresaId;
+            ->whereHas('rol', function ($query) {
+                $query->whereIn('nombre', ['admin', 'propietario', 'programador', 'superadmin']);
+            })
+            ->when($empresaId !== null, function ($query) use ($empresaId) {
+                $query->whereHas('sucursal', function ($sucursalQuery) use ($empresaId) {
+                    $sucursalQuery->withoutGlobalScopes()->where('empresa_id', $empresaId);
+                });
             })
             ->pluck('id')
             ->map(fn ($id) => (int) $id)

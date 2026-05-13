@@ -2,13 +2,18 @@
 
 namespace App\Http\Controllers\Reporteria;
 
+use App\Exports\CultivoCategoriaConsumosExport;
 use App\Http\Controllers\Controller;
 use App\Exports\CultivosReportExport;
+use App\Models\Consumo;
+use App\Models\Cosecha;
+use App\Models\CosechaFactura;
 use App\Models\Cultivo;
 use App\Models\Lote;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
 
 class CultivosReportController extends Controller
@@ -16,18 +21,13 @@ class CultivosReportController extends Controller
     public function index(Request $request)
     {
         $lotes = Lote::orderBy('nombre')->get(['id', 'nombre']);
+        $perPage = $this->resolverPerPage($request);
 
-        $cultivos = $this->buildRows($request);
+        $cultivos = $this->buildRowsPaginadas($request, $perPage);
 
-        $metricas = [
-            'registros' => $cultivos->count(),
-            'activos' => $cultivos->where('estado', 'Activo')->count(),
-            'inversion' => $cultivos->sum('inversion'),
-            'ingresos' => $cultivos->sum('ingresos'),
-            'disponible' => $cultivos->sum('disponible'),
-        ];
+        $metricas = $this->buildMetricas($request);
 
-        return view('modules.reporteria.cultivos', compact('lotes', 'cultivos', 'metricas'));
+        return view('modules.reporteria.cultivos', compact('lotes', 'cultivos', 'metricas', 'perPage'));
     }
 
     public function exportExcel(Request $request)
@@ -49,7 +49,7 @@ class CultivosReportController extends Controller
             'disponible' => $cultivos->sum('disponible'),
         ];
 
-        $pdf = Pdf::loadView('modules.reporteria.cultivos_pdf', compact('cultivos', 'metricas'));
+        $pdf = app('dompdf.wrapper')->loadView('modules.reporteria.cultivos_pdf', compact('cultivos', 'metricas'));
 
         return $pdf->download('reporte_cultivos_' . now()->format('Ymd_His') . '.pdf');
     }
@@ -109,47 +109,7 @@ class CultivosReportController extends Controller
 
     public function consumosPorCategoria(Request $request, int $cultivoId)
     {
-        $cultivo = $this->baseCultivoQuery([
-            'consumos.detalles.insumo',
-            'consumos.detalles.bodega',
-            'consumos.validador',
-            'consumos.anulador',
-        ])->findOrFail($cultivoId);
-
-        $categoria = trim((string) $request->query('categoria', ''));
-
-        if ($categoria === '') {
-            abort(422, 'La categoria es requerida.');
-        }
-
-        $categoriaNormalizada = $this->normalizarCategoriaConsumo($categoria);
-
-        $detallesCategoria = $cultivo->consumos
-            ->sortByDesc('fecha_consumo')
-            ->flatMap(function ($consumo) use ($categoriaNormalizada) {
-                return $consumo->detalles
-                    ->filter(fn ($detalle) => $this->normalizarCategoriaConsumo($detalle->categoria) === $categoriaNormalizada)
-                    ->map(function ($detalle) use ($consumo, $categoriaNormalizada) {
-                        $esManoObra = $categoriaNormalizada === 'Mano De Obra';
-
-                        return (object) [
-                            'consumo_id' => $consumo->id,
-                            'fecha' => (string) $consumo->fecha_consumo,
-                            'estado' => $consumo->estado_normalizado,
-                            'categoria' => $categoriaNormalizada,
-                            'codigo' => $esManoObra ? null : ($detalle->insumo->codigo ?? null),
-                            'descripcion' => $detalle->descripcion,
-                            'insumo' => $esManoObra ? null : ($detalle->insumo->nombre ?? null),
-                            'bodega' => $detalle->bodega->nombre ?? '-',
-                            'lote' => $detalle->lote ?: '-',
-                            'cantidad' => (float) $detalle->cantidad,
-                            'unidad_medida' => $detalle->unidad_medida ?: '-',
-                            'costo_unitario' => (float) $detalle->costo_unitario,
-                            'subtotal' => (float) $detalle->subtotal,
-                        ];
-                    });
-            })
-            ->values();
+        [$cultivo, $categoriaNormalizada, $detallesCategoria, $fecha, $actividad] = $this->resolverDetalleCategoria($request, $cultivoId);
 
         return view('modules.reporteria.partials.cultivo_consumos_categoria', [
             'cultivo' => $cultivo,
@@ -158,38 +118,150 @@ class CultivosReportController extends Controller
             'totalCategoria' => (float) $detallesCategoria->sum('subtotal'),
             'cantidadCategoria' => (float) $detallesCategoria->sum('cantidad'),
             'fechasCategoria' => $detallesCategoria->pluck('fecha')->filter()->unique()->sortDesc()->values(),
+            'selectedFecha' => $fecha,
+            'selectedActividad' => $actividad,
         ]);
+    }
+
+    public function exportConsumosCategoriaExcel(Request $request, int $cultivoId)
+    {
+        [$cultivo, $categoriaNormalizada, $detallesCategoria] = $this->resolverDetalleCategoria($request, $cultivoId);
+
+        $fileName = 'cultivo_' . $cultivo->id . '_categoria_' . Str::slug($categoriaNormalizada, '_') . '_' . now()->format('Ymd_His') . '.xlsx';
+
+        return Excel::download(new CultivoCategoriaConsumosExport($cultivo, $categoriaNormalizada, $detallesCategoria), $fileName);
+    }
+
+    public function exportConsumosCategoriaPdf(Request $request, int $cultivoId)
+    {
+        [$cultivo, $categoriaNormalizada, $detallesCategoria, $fecha, $actividad] = $this->resolverDetalleCategoria($request, $cultivoId);
+
+        $pdf = app('dompdf.wrapper')->loadView('modules.reporteria.cultivo_consumos_categoria_pdf', [
+            'cultivo' => $cultivo,
+            'categoria' => $categoriaNormalizada,
+            'detallesCategoria' => $detallesCategoria,
+            'totalCategoria' => (float) $detallesCategoria->sum('subtotal'),
+            'cantidadCategoria' => (float) $detallesCategoria->sum('cantidad'),
+            'selectedFecha' => $fecha,
+            'selectedActividad' => $actividad,
+        ]);
+
+        return $pdf->download('cultivo_' . $cultivo->id . '_categoria_' . Str::slug($categoriaNormalizada, '_') . '_' . now()->format('Ymd_His') . '.pdf');
     }
 
     private function buildRows(Request $request)
     {
-        return $this->baseCultivoQuery()
-            ->withSum('consumos', 'total')
-            ->when($request->filled('lote_id'), fn ($query) => $query->where('lotes_id', $request->lote_id))
-            ->when($request->filled('estado'), fn ($query) => $query->where('estado', $request->estado))
-            ->orderByDesc('fecha_siembra')
+        return $this->buildRowsQuery($request)
             ->get()
-            ->map(function ($cultivo) {
-                $facturas = $this->facturasDeCosechas($cultivo->cosechas);
-                $ingresos = (float) $facturas->sum('total');
-                $inversion = (float) ($cultivo->consumos_sum_total ?? 0);
+            ->map(fn ($cultivo) => $this->formatCultivoRow($cultivo));
+    }
 
-                return [
-                    'id' => $cultivo->id,
-                    'nombre' => $cultivo->nombre,
-                    'codigo' => $cultivo->codigo,
-                    'lote' => $cultivo->lote->nombre ?? '-',
-                    'estado' => $cultivo->estado,
-                    'unidad_medida' => $cultivo->unidad_medida,
-                    'fecha_siembra' => $cultivo->fecha_siembra,
-                    'hectareas' => (float) ($cultivo->hectareas ?? 0),
-                    'inversion' => $inversion,
-                    'produccion' => (float) $cultivo->cosechas->sum('cantidad_neta'),
-                    'disponible' => (float) $cultivo->cosechas->sum('cantidad_disponible'),
-                    'ingresos' => $ingresos,
-                    'utilidad' => $ingresos - $inversion,
-                ];
-            });
+    private function buildRowsPaginadas(Request $request, int $perPage)
+    {
+        return $this->buildRowsQuery($request)
+            ->paginate($perPage)
+            ->through(fn ($cultivo) => $this->formatCultivoRow($cultivo))
+            ->withQueryString();
+    }
+
+    private function buildRowsQuery(Request $request)
+    {
+        $facturasDisponibles = $this->cosechaFacturasDisponible();
+
+        $consumosSubquery = Consumo::query()
+            ->selectRaw('cultivo_id, COALESCE(SUM(total), 0) as inversion')
+            ->groupBy('cultivo_id');
+
+        $cosechasSubquery = Cosecha::query()
+            ->selectRaw('cultivo_id, COALESCE(SUM(cantidad_neta), 0) as produccion, COALESCE(SUM(cantidad_disponible), 0) as disponible')
+            ->groupBy('cultivo_id');
+
+        $query = Cultivo::query()
+            ->leftJoin('lotes', 'cultivos.lotes_id', '=', 'lotes.id')
+            ->leftJoinSub($consumosSubquery, 'consumos_totales', function ($join) {
+                $join->on('consumos_totales.cultivo_id', '=', 'cultivos.id');
+            })
+            ->leftJoinSub($cosechasSubquery, 'cosechas_totales', function ($join) {
+                $join->on('cosechas_totales.cultivo_id', '=', 'cultivos.id');
+            })
+            ->when($facturasDisponibles, function ($baseQuery) {
+                $facturasSubquery = CosechaFactura::query()
+                    ->join('cosechas', 'cosechas.id', '=', 'cosecha_facturas.cosecha_id')
+                    ->selectRaw('cosechas.cultivo_id, COALESCE(SUM(cosecha_facturas.total), 0) as ingresos')
+                    ->groupBy('cosechas.cultivo_id');
+
+                $baseQuery->leftJoinSub($facturasSubquery, 'facturas_totales', function ($join) {
+                    $join->on('facturas_totales.cultivo_id', '=', 'cultivos.id');
+                });
+            })
+            ->when($request->filled('lote_id'), fn ($query) => $query->where('cultivos.lotes_id', $request->lote_id))
+            ->when($request->filled('estado'), fn ($query) => $query->where('cultivos.estado', $request->estado))
+            ->select([
+                'cultivos.id',
+                'cultivos.nombre',
+                'cultivos.codigo',
+                'cultivos.estado',
+                'cultivos.unidad_medida',
+                'cultivos.fecha_siembra',
+                'cultivos.hectareas',
+                DB::raw("COALESCE(lotes.nombre, '-') as lote_nombre"),
+                DB::raw('COALESCE(consumos_totales.inversion, 0) as inversion'),
+                DB::raw('COALESCE(cosechas_totales.produccion, 0) as produccion'),
+                DB::raw('COALESCE(cosechas_totales.disponible, 0) as disponible'),
+                DB::raw($facturasDisponibles ? 'COALESCE(facturas_totales.ingresos, 0) as ingresos' : '0 as ingresos'),
+            ])
+            ->orderByDesc('cultivos.fecha_siembra');
+
+        return $query;
+    }
+
+    private function formatCultivoRow(object $cultivo): array
+    {
+        $ingresos = (float) ($cultivo->ingresos ?? 0);
+        $inversion = (float) ($cultivo->inversion ?? 0);
+
+        return [
+            'id' => (int) $cultivo->id,
+            'nombre' => $cultivo->nombre,
+            'codigo' => $cultivo->codigo,
+            'lote' => $cultivo->lote_nombre ?? '-',
+            'estado' => $cultivo->estado,
+            'unidad_medida' => $cultivo->unidad_medida,
+            'fecha_siembra' => $cultivo->fecha_siembra,
+            'hectareas' => (float) ($cultivo->hectareas ?? 0),
+            'inversion' => $inversion,
+            'produccion' => (float) ($cultivo->produccion ?? 0),
+            'disponible' => (float) ($cultivo->disponible ?? 0),
+            'ingresos' => $ingresos,
+            'utilidad' => $ingresos - $inversion,
+        ];
+    }
+
+    private function buildMetricas(Request $request): array
+    {
+        $metricas = DB::query()
+            ->fromSub($this->buildRowsQuery($request), 'cultivos_reporte')
+            ->selectRaw('COUNT(*) as registros')
+            ->selectRaw("COALESCE(SUM(CASE WHEN estado = 'Activo' THEN 1 ELSE 0 END), 0) as activos")
+            ->selectRaw('COALESCE(SUM(inversion), 0) as inversion')
+            ->selectRaw('COALESCE(SUM(ingresos), 0) as ingresos')
+            ->selectRaw('COALESCE(SUM(disponible), 0) as disponible')
+            ->first();
+
+        return [
+            'registros' => (int) ($metricas->registros ?? 0),
+            'activos' => (int) ($metricas->activos ?? 0),
+            'inversion' => (float) ($metricas->inversion ?? 0),
+            'ingresos' => (float) ($metricas->ingresos ?? 0),
+            'disponible' => (float) ($metricas->disponible ?? 0),
+        ];
+    }
+
+    private function resolverPerPage(Request $request): int
+    {
+        $perPage = (int) $request->input('per_page', 50);
+
+        return in_array($perPage, [25, 50, 100], true) ? $perPage : 50;
     }
 
     private function baseCultivoQuery(array $extraRelations = [])
@@ -277,5 +349,60 @@ class CultivosReportController extends Controller
         }
 
         return mb_convert_case($texto, MB_CASE_TITLE, 'UTF-8');
+    }
+
+    private function resolverDetalleCategoria(Request $request, int $cultivoId): array
+    {
+        $cultivo = $this->baseCultivoQuery([
+            'consumos.detalles.insumo',
+            'consumos.detalles.bodega',
+            'consumos.validador',
+            'consumos.anulador',
+        ])->findOrFail($cultivoId);
+
+        $categoria = trim((string) $request->query('categoria', ''));
+
+        if ($categoria === '') {
+            abort(422, 'La categoria es requerida.');
+        }
+
+        $fecha = trim((string) $request->query('fecha', ''));
+        $actividad = trim((string) $request->query('actividad', ''));
+        $categoriaNormalizada = $this->normalizarCategoriaConsumo($categoria);
+
+        $detallesCategoria = $cultivo->consumos
+            ->sortByDesc('fecha_consumo')
+            ->flatMap(function ($consumo) use ($categoriaNormalizada) {
+                return $consumo->detalles
+                    ->filter(fn ($detalle) => $this->normalizarCategoriaConsumo($detalle->categoria) === $categoriaNormalizada)
+                    ->map(function ($detalle) use ($consumo, $categoriaNormalizada) {
+                        $esManoObra = $categoriaNormalizada === 'Mano De Obra';
+
+                        return (object) [
+                            'consumo_id' => $consumo->id,
+                            'fecha' => (string) $consumo->fecha_consumo,
+                            'estado' => $consumo->estado_normalizado,
+                            'categoria' => $categoriaNormalizada,
+                            'codigo' => $esManoObra ? null : ($detalle->insumo->codigo ?? null),
+                            'descripcion' => $detalle->descripcion,
+                            'insumo' => $esManoObra ? null : ($detalle->insumo->nombre ?? null),
+                            'bodega' => $detalle->bodega->nombre ?? '-',
+                            'lote' => $detalle->lote ?: '-',
+                            'cantidad' => (float) $detalle->cantidad,
+                            'unidad_medida' => $detalle->unidad_medida ?: '-',
+                            'costo_unitario' => (float) $detalle->costo_unitario,
+                            'subtotal' => (float) $detalle->subtotal,
+                        ];
+                    });
+            })
+            ->filter(function ($detalle) use ($fecha, $actividad) {
+                $matchesFecha = $fecha === '' || $detalle->fecha === $fecha;
+                $matchesActividad = $actividad === '' || (string) $detalle->descripcion === $actividad;
+
+                return $matchesFecha && $matchesActividad;
+            })
+            ->values();
+
+        return [$cultivo, $categoriaNormalizada, $detallesCategoria, $fecha, $actividad];
     }
 }

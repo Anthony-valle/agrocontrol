@@ -8,7 +8,12 @@
         ->values();
 @endphp
 
-<div class="card border-0 shadow-sm mb-0 categoria-detail-card-shell">
+<div
+    class="card border-0 shadow-sm mb-0 categoria-detail-card-shell"
+    data-export-excel-base="{{ route('reporteria.cultivos.consumos-categoria.excel', $cultivo->id) }}"
+    data-export-pdf-base="{{ route('reporteria.cultivos.consumos-categoria.pdf', $cultivo->id) }}"
+    data-export-categoria="{{ $categoria }}"
+>
     <div class="card-body">
         <div class="row g-3 mb-3">
             <div class="col-md-4">
@@ -24,6 +29,16 @@
                 <label class="fw-bold d-block text-muted small uppercase">Totales</label>
                 <div>{{ agro_number($cantidadCategoria, 2) }} cantidad</div>
                 <div class="small text-muted">{{ agro_number($totalCategoria, 2) }} Lps</div>
+            </div>
+            <div class="col-12">
+                <div class="d-flex flex-wrap gap-2 justify-content-end">
+                    <a href="{{ route('reporteria.cultivos.consumos-categoria.excel', ['cultivo' => $cultivo->id, 'categoria' => $categoria, 'fecha' => $selectedFecha ?: null, 'actividad' => $selectedActividad ?: null]) }}" class="btn btn-success btn-sm categoria-export-link" data-export-type="excel">
+                        <i class="fa-solid fa-file-excel me-1"></i> Descargar Excel
+                    </a>
+                    <a href="{{ route('reporteria.cultivos.consumos-categoria.pdf', ['cultivo' => $cultivo->id, 'categoria' => $categoria, 'fecha' => $selectedFecha ?: null, 'actividad' => $selectedActividad ?: null]) }}" class="btn btn-danger btn-sm categoria-export-link" data-export-type="pdf">
+                        <i class="fa-solid fa-file-pdf me-1"></i> Descargar PDF
+                    </a>
+                </div>
             </div>
             <div class="col-12">
                 <label class="fw-bold d-block text-muted small uppercase">Fechas relacionadas</label>

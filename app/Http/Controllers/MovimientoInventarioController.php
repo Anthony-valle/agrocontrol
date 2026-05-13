@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Exports\EntradaInicialTemplateExport;
 use App\Imports\EntradaInicialImport;
+use App\Jobs\ProcesarEntradaInicialImport;
 use App\Models\Bodega;
 use App\Models\FacturaInventario;
 use App\Models\Insumo;
@@ -14,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -190,10 +192,44 @@ class MovimientoInventarioController extends Controller
             'archivo_excel' => 'required|file|mimes:xlsx,xls,csv',
         ]);
 
+        $empresaId = $this->resolverEmpresaIdActual();
+
+        if (config('queue.default') !== 'sync') {
+            $archivo = $request->file('archivo_excel');
+            $extension = strtolower((string) $archivo?->getClientOriginalExtension());
+            $nombreArchivo = (string) ($archivo?->getClientOriginalName() ?: 'entrada_inicial.' . $extension);
+            $rutaArchivo = Storage::disk('local')->putFileAs(
+                'imports/entradas-iniciales',
+                $archivo,
+                now()->format('YmdHis') . '-' . Str::uuid() . '.' . $extension
+            );
+
+            ProcesarEntradaInicialImport::dispatch(
+                $rutaArchivo,
+                (int) Auth::id(),
+                Auth::user()->sucursal_id !== null ? (int) Auth::user()->sucursal_id : null,
+                $empresaId,
+                $nombreArchivo
+            );
+
+            return response()->json([
+                'title' => 'Carga masiva en cola',
+                'success' => 'El archivo fue enviado a la cola de procesamiento.',
+                'summary_html' => $this->buildImportSummaryHtml([
+                    'Archivo recibido: ' . $nombreArchivo,
+                    'Modo de ejecucion: cola en segundo plano',
+                    'La importacion ya no bloquea la peticion web mientras se procesa.',
+                    'Recibiras una notificacion interna cuando termine o falle.',
+                ]),
+                'redirect' => route('movimientos.index'),
+                'queued' => true,
+            ], 202);
+        }
+
         $import = new EntradaInicialImport(
             Auth::id(),
             Auth::user()->sucursal_id ?? null,
-            Auth::user()->empresa_id ?? null
+            $empresaId
         );
 
         try {
@@ -237,6 +273,14 @@ class MovimientoInventarioController extends Controller
         }
 
         return 'Error al importar el archivo: ' . $mensaje;
+    }
+
+    private function resolverEmpresaIdActual(): ?int
+    {
+        $user = Auth::user();
+        $empresaId = $user?->empresa_id ?? $user?->sucursal?->empresa_id;
+
+        return $empresaId !== null ? (int) $empresaId : null;
     }
 
     // ----------------------------
@@ -330,10 +374,11 @@ class MovimientoInventarioController extends Controller
                     ]));
 
                     $archivo = $request->file('archivos')[$index] ?? null;
-                    $nombreArchivo = null;
+                    $rutaArchivo = null;
 
                     if ($archivo) {
                         $nombreArchivo = time() . '_' . $archivo->getClientOriginalName();
+                        $rutaArchivo = 'facturas/' . $nombreArchivo;
                         $archivo->storeAs('facturas', $nombreArchivo, 'public');
                     }
 
@@ -349,7 +394,7 @@ class MovimientoInventarioController extends Controller
                         'numero_lote' => $numeroLotePersistible,
                         'fecha_fabricacion' => $fechaFab,
                         'fecha_vencimiento' => $fechaVen,
-                        'archivo' => $nombreArchivo,
+                        'archivo' => $rutaArchivo,
                         'created_by' => Auth::id(),
                     ]);
 
@@ -363,6 +408,7 @@ class MovimientoInventarioController extends Controller
                         'tipo' => 'compra',
                         'cantidad' => $cantidad,
                         'costo_unitario' => $precio,
+                        'factura' => $rutaArchivo,
                         'proveedor' => $proveedor,
                         'fecha_ingreso' => now()->toDateString(),
                         'created_by' => Auth::id(),
@@ -494,7 +540,7 @@ class MovimientoInventarioController extends Controller
         $bodegas = $this->getActivos(Bodega::class, 'bodegas');
         $lotes = InventarioBodega::all();
 
-        return view('modules.movimientos.traslados.traslados', compact('insumos', 'bodegas', 'lotes'));
+        return view('modules.movimientos.traslados', compact('insumos', 'bodegas', 'lotes'));
     }
 
     public function trasladoStore(Request $request)

@@ -45,7 +45,8 @@ class ConsumosReportController extends Controller
         $consumos = $this->baseQuery($request)->get();
         $filtros = $request->only(['lote_id', 'cultivo_id', 'fecha_inicio', 'fecha_fin']);
 
-        $pdf = Pdf::loadView('modules.reporteria.consumos_pdf', compact('consumos', 'filtros'));
+        $pdf = Pdf::loadView('modules.reporteria.consumos_pdf', compact('consumos', 'filtros'))
+            ->setPaper('a4', 'landscape');
 
         return $pdf->download('reporte_consumos_' . now()->format('Ymd_His') . '.pdf');
     }

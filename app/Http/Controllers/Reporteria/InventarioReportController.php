@@ -10,9 +10,9 @@ use App\Models\Insumo;
 use App\Models\InventarioBodega;
 use App\Models\MovimientoInventario;
 use App\Models\Sucursale;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -23,33 +23,15 @@ class InventarioReportController extends Controller
         $sucursales = Sucursale::orderBy('nombre')->get(['id', 'nombre']);
         $bodegas = Bodega::orderBy('nombre')->get(['id', 'nombre', 'sucursal_id']);
         $categorias = $this->obtenerCategoriasDisponibles();
+        $perPage = $this->resolverPerPage($request);
 
-        $inventarios = $this->inventariosFiltrados($request)->get();
+        $inventarioQuery = $this->inventariosFiltrados($request);
+        $inventarios = (clone $inventarioQuery)
+            ->paginate($perPage)
+            ->withQueryString();
 
-        $hoy = Carbon::today();
-        $limite = Carbon::today()->addDays(30);
-
-        $metricas = [
-            'lotes' => $inventarios->count(),
-            'stock_total' => $inventarios->sum('stock_actual'),
-            'valor_total' => $inventarios->sum(fn ($item) => $item->stock_actual * $item->costo_promedio),
-            'stock_bajo' => $inventarios->filter(fn ($item) => $item->insumo && $item->insumo->stock_minimo !== null && $item->stock_actual <= $item->insumo->stock_minimo)->count(),
-            'vencidos' => $inventarios->filter(fn ($item) => $item->fecha_vencimiento && Carbon::parse($item->fecha_vencimiento)->lt($hoy))->count(),
-            'proximos' => $inventarios->filter(fn ($item) => $item->fecha_vencimiento && Carbon::parse($item->fecha_vencimiento)->between($hoy, $limite))->count(),
-        ];
-
-        $resumenCategorias = $inventarios
-            ->groupBy(fn ($item) => $this->resolverNombreCategoria($item->insumo))
-            ->map(function ($items, $categoria) {
-                return [
-                    'categoria' => $categoria,
-                    'lotes' => $items->count(),
-                    'stock' => $items->sum('stock_actual'),
-                    'valor' => $items->sum(fn ($item) => $item->stock_actual * $item->costo_promedio),
-                ];
-            })
-            ->sortByDesc('valor')
-            ->values();
+        $metricas = $this->calcularMetricasInventario(clone $inventarioQuery);
+        $resumenCategorias = $this->resumenCategoriasInventario(clone $inventarioQuery);
 
         $movimientos = MovimientoInventario::with(['insumo', 'bodegaOrigen', 'bodegaDestino'])
             ->when($request->filled('sucursal_id'), fn ($query) => $query->where('sucursal_id', $request->sucursal_id))
@@ -66,6 +48,7 @@ class InventarioReportController extends Controller
             'bodegas',
             'categorias',
             'inventarios',
+            'perPage',
             'metricas',
             'resumenCategorias',
             'movimientos'
@@ -85,7 +68,7 @@ class InventarioReportController extends Controller
         $inventarios = $this->inventariosFiltrados($request)->get();
         $filtros = $request->only(['sucursal_id', 'bodega_id', 'categoria', 'estado_vencimiento']);
 
-        $pdf = Pdf::loadView('modules.reporteria.inventario_pdf', compact('inventarios', 'filtros'));
+        $pdf = app('dompdf.wrapper')->loadView('modules.reporteria.inventario_pdf', compact('inventarios', 'filtros'));
 
         return $pdf->download('reporte_inventario_' . now()->format('Ymd_His') . '.pdf');
     }
@@ -170,5 +153,72 @@ class InventarioReportController extends Controller
         }
 
         return $query;
+    }
+
+    private function resolverPerPage(Request $request): int
+    {
+        $perPage = (int) $request->input('per_page', 50);
+
+        return in_array($perPage, [25, 50, 100], true) ? $perPage : 50;
+    }
+
+    private function calcularMetricasInventario(mixed $query): array
+    {
+        $hoy = Carbon::today()->toDateString();
+        $limite = Carbon::today()->addDays(30)->toDateString();
+
+        $metricas = (clone $query)
+            ->leftJoin('insumos', 'inventario_bodegas.insumo_id', '=', 'insumos.id')
+            ->selectRaw('COUNT(*) as lotes')
+            ->selectRaw('COALESCE(SUM(inventario_bodegas.stock_actual), 0) as stock_total')
+            ->selectRaw('COALESCE(SUM(inventario_bodegas.stock_actual * inventario_bodegas.costo_promedio), 0) as valor_total')
+            ->selectRaw('COALESCE(SUM(CASE WHEN insumos.stock_minimo IS NOT NULL AND inventario_bodegas.stock_actual <= insumos.stock_minimo THEN 1 ELSE 0 END), 0) as stock_bajo')
+            ->selectRaw('COALESCE(SUM(CASE WHEN inventario_bodegas.fecha_vencimiento IS NOT NULL AND DATE(inventario_bodegas.fecha_vencimiento) < ? THEN 1 ELSE 0 END), 0) as vencidos', [$hoy])
+            ->selectRaw('COALESCE(SUM(CASE WHEN inventario_bodegas.fecha_vencimiento IS NOT NULL AND DATE(inventario_bodegas.fecha_vencimiento) BETWEEN ? AND ? THEN 1 ELSE 0 END), 0) as proximos', [$hoy, $limite])
+            ->first();
+
+        return [
+            'lotes' => (int) ($metricas->lotes ?? 0),
+            'stock_total' => (float) ($metricas->stock_total ?? 0),
+            'valor_total' => (float) ($metricas->valor_total ?? 0),
+            'stock_bajo' => (int) ($metricas->stock_bajo ?? 0),
+            'vencidos' => (int) ($metricas->vencidos ?? 0),
+            'proximos' => (int) ($metricas->proximos ?? 0),
+        ];
+    }
+
+    private function resumenCategoriasInventario(mixed $query)
+    {
+        $categoriaExpr = $this->categoriaSqlExpression();
+
+        return (clone $query)
+            ->leftJoin('insumos', 'inventario_bodegas.insumo_id', '=', 'insumos.id')
+            ->leftJoin('categorias', 'insumos.categoria_id', '=', 'categorias.id')
+            ->selectRaw($categoriaExpr . ' as categoria')
+            ->selectRaw('COUNT(*) as lotes')
+            ->selectRaw('COALESCE(SUM(inventario_bodegas.stock_actual), 0) as stock')
+            ->selectRaw('COALESCE(SUM(inventario_bodegas.stock_actual * inventario_bodegas.costo_promedio), 0) as valor')
+            ->groupBy(DB::raw($categoriaExpr))
+            ->orderByDesc('valor')
+            ->get()
+            ->map(fn ($fila) => [
+                'categoria' => (string) ($fila->categoria ?: 'Sin categoría'),
+                'lotes' => (int) ($fila->lotes ?? 0),
+                'stock' => (float) ($fila->stock ?? 0),
+                'valor' => (float) ($fila->valor ?? 0),
+            ]);
+    }
+
+    private function categoriaSqlExpression(): string
+    {
+        if (Schema::hasColumn('insumos', 'categoria_nombre')) {
+            return "COALESCE(NULLIF(insumos.categoria_nombre, ''), 'Sin categoría')";
+        }
+
+        if (Schema::hasColumn('insumos', 'categoria_id')) {
+            return "COALESCE(NULLIF(categorias.nombre, ''), 'Sin categoría')";
+        }
+
+        return "'Sin categoría'";
     }
 }

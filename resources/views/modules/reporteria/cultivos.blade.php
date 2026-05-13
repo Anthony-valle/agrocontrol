@@ -47,10 +47,9 @@
                     <div class="d-flex align-items-center gap-3">
                         <div class="d-flex align-items-center gap-2">
                             <select id="customPerPage" class="form-select form-select-sm" style="width: auto;">
-                                <option value="5">5</option>
-                                <option value="10" selected>10</option>
-                                <option value="20">20</option>
-                                <option value="50">50</option>
+                                <option value="25" {{ $perPage === 25 ? 'selected' : '' }}>25</option>
+                                <option value="50" {{ $perPage === 50 ? 'selected' : '' }}>50</option>
+                                <option value="100" {{ $perPage === 100 ? 'selected' : '' }}>100</option>
                             </select>
                             <small class="text-muted text-nowrap">registros</small>
                         </div>
@@ -118,8 +117,53 @@
                         </tbody>
                     </table>
                 </div>
+
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mt-3">
+                    <small class="text-muted">
+                        Mostrando {{ $cultivos->firstItem() ?? 0 }} a {{ $cultivos->lastItem() ?? 0 }} de {{ $cultivos->total() }} cultivos.
+                    </small>
+                    {{ $cultivos->onEachSide(1)->links('vendor.pagination.bootstrap-5-notext') }}
+                </div>
             </div>
         </div>
     </section>
 </main>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const inputBusqueda = document.getElementById('inputBusqueda');
+    const perPageSelect = document.getElementById('customPerPage');
+    const tabla = document.querySelector('#tablaReporteriaCultivos tbody');
+
+    if (perPageSelect) {
+        perPageSelect.addEventListener('change', function () {
+            const url = new URL(window.location.href);
+            url.searchParams.set('per_page', this.value);
+            url.searchParams.delete('page');
+            window.location.href = url.toString();
+        });
+    }
+
+    if (!inputBusqueda || !tabla) {
+        return;
+    }
+
+    const filas = Array.from(tabla.querySelectorAll('tr'));
+
+    inputBusqueda.addEventListener('input', function () {
+        const termino = this.value.trim().toLowerCase();
+
+        filas.forEach(function (fila) {
+            if (fila.children.length === 1) {
+                return;
+            }
+
+            const texto = fila.innerText.toLowerCase();
+            fila.style.display = termino === '' || texto.includes(termino) ? '' : 'none';
+        });
+    });
+});
+</script>
+@endpush

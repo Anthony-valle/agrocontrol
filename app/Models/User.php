@@ -12,6 +12,25 @@ class User extends Authenticatable
 {
     use Notifiable, SoftDeletes, TracksDeletionMetadata;
 
+    private const SUPER_USER_ROLES = [
+        'admin',
+        'administrador',
+        'programador',
+        'propietario',
+        'superadmin',
+        'super administrador',
+        'super-administrador',
+    ];
+
+    private const SENSITIVE_ACTION_ROLES = [
+        'admin',
+        'administrador',
+        'propietario',
+        'superadmin',
+        'super administrador',
+        'super-administrador',
+    ];
+
     protected $fillable = [
         'name',
         'nombre_completo',
@@ -124,7 +143,7 @@ class User extends Authenticatable
 
     public function hasRole(string $nombre): bool
     {
-        return strtolower($this->rol->nombre ?? '') === strtolower($nombre);
+        return $this->normalizeRoleName($this->rol->nombre ?? '') === $this->normalizeRoleName($nombre);
     }
 
     public function isProgramador(): bool
@@ -134,13 +153,19 @@ class User extends Authenticatable
 
     public function isSuperUser(): bool
     {
-        return $this->hasAnyRole(['admin', 'programador', 'propietario']);
+        return $this->hasAnyRole(self::SUPER_USER_ROLES);
     }
 
     public function hasAnyRole(array $roles): bool
     {
-        $currentRole = strtolower($this->rol->nombre ?? '');
-        return in_array($currentRole, array_map('strtolower', $roles), true);
+        $currentRole = $this->normalizeRoleName($this->rol->nombre ?? '');
+
+        return in_array($currentRole, array_map(fn ($role) => $this->normalizeRoleName($role), $roles), true);
+    }
+
+    public function canManageSensitiveActions(): bool
+    {
+        return $this->hasAnyRole(self::SENSITIVE_ACTION_ROLES);
     }
 
     public function hasAccess(string $permission): bool
@@ -157,6 +182,11 @@ class User extends Authenticatable
         }
 
         return false;
+    }
+
+    private function normalizeRoleName(?string $role): string
+    {
+        return preg_replace('/[^a-z0-9]/', '', strtolower(trim((string) $role))) ?? '';
     }
 }
 

@@ -347,6 +347,36 @@ document.addEventListener('DOMContentLoaded', function () {
                     : `Mostrando ${visibleCount} registros para la actividad ${selectedActivity} en la fecha seleccionada.`;
             }
         }
+
+        const categoria = shell.dataset.exportCategoria || '';
+        const excelBase = shell.dataset.exportExcelBase || '';
+        const pdfBase = shell.dataset.exportPdfBase || '';
+        const exportLinks = Array.from(shell.querySelectorAll('.categoria-export-link'));
+
+        exportLinks.forEach((link) => {
+            const baseUrl = link.dataset.exportType === 'pdf' ? pdfBase : excelBase;
+
+            if (!baseUrl || !categoria) {
+                return;
+            }
+
+            const url = new URL(baseUrl, window.location.origin);
+            url.searchParams.set('categoria', categoria);
+
+            if (selectedDate !== '__ALL__') {
+                url.searchParams.set('fecha', selectedDate);
+            } else {
+                url.searchParams.delete('fecha');
+            }
+
+            if (selectedActivity !== '__ALL__') {
+                url.searchParams.set('actividad', selectedActivity);
+            } else {
+                url.searchParams.delete('actividad');
+            }
+
+            link.href = url.toString();
+        });
     }
 
     async function cargarDetallePorCategoria(button) {
@@ -371,6 +401,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             categoriaDetailContainer.innerHTML = await response.text();
+            aplicarFiltrosCategoria(categoriaDetailContainer.querySelector('.categoria-detail-card-shell'));
         } catch (error) {
             categoriaDetailContainer.innerHTML = '<div class="alert alert-danger mb-0">No se pudo cargar el detalle de la categoría seleccionada.</div>';
         }

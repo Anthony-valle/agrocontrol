@@ -29,12 +29,12 @@
                 </select>
             </div>
 
-            <div class="col-md-3 mb-3">
+            <div class="col-md-2 mb-3">
                 <label class="form-label">Costo Unitario</label>
                 <input type="number" step="0.01" name="costo_unitario" class="form-control" value="{{ $labore->costo_unitario }}" required min="0">
             </div>
 
-            <div class="col-md-3 mb-3">
+            <div class="col-md-2 mb-3">
                 <label class="form-label">Estado</label>
                 <select name="estado" class="form-select">
                     <option value="1" {{ (string) old('estado', $labore->estado) === '1' ? 'selected' : '' }}>Activo</option>
@@ -42,7 +42,7 @@
                 </select>
             </div>
 
-            <div class="col-md-6 mb-3">
+            <div class="col-md-5 mb-3">
                 <label class="form-label">Observaciones</label>
                 <input type="text" name="observaciones" class="form-control" value="{{ $labore->observaciones }}" maxlength="100">
             </div>

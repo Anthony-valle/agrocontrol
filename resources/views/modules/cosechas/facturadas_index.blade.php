@@ -1,12 +1,12 @@
 @extends('layouts.main')
 
-@section('titulo', $titulo ?? 'Ventas Facturadas')
+@section('titulo', $titulo ?? 'Facturación de Cosechas')
 
 @section('contenido')
 <main id="main" class="main">
 
     <div class="pagetitle">
-        <h1>Ventas y Facturación</h1>
+        <h1>Facturación de Cosechas</h1>
     </div>
 
     <section class="section">
@@ -14,7 +14,7 @@
             <div class="col-lg-12">
                 <div class="card">
                     <div class="card-body">
-                        <h5 class="card-title">Gestión de Ventas y Facturación</h5>
+                        <h5 class="card-title">Registrar facturas y ventas de cosecha</h5>
 
                         <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 p-2 bg-light rounded shadow-sm gap-3">
                             <div class="d-flex align-items-center gap-3 flex-wrap">

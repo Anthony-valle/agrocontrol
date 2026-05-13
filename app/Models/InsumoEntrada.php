@@ -9,27 +9,33 @@ class InsumoEntrada extends Model
 {
     use HasFactory;
 
+    protected $table = 'insumo_entradas';
+
     protected $fillable = [
         'insumo_id',
         'bodega_id',
         'tipo',
-        'cantidad',
-        'precio_unitario',
+        'cantida',
+        'costo_unitario',
         'factura',
         'proveedor',
         'fecha_ingreso',
-        'created_by'
+        'created_by',
+        'updated_by',
     ];
 
-    public function insumo() {
+    public function insumo()
+    {
         return $this->belongsTo(Insumo::class);
     }
 
-    public function bodega() {
+    public function bodega()
+    {
         return $this->belongsTo(Bodega::class);
     }
 
-    public function creador() {
-        return $this->belongsTo(User::class,'created_by');
+    public function creador()
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 }

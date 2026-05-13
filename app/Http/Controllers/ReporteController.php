@@ -7,13 +7,26 @@ use App\Models\Cultivo;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Maatwebsite\Excel\Facades\Excel;
 
 class ReporteController extends Controller
 {
     public function reporteFinal(int $cultivo_id)
     {
-        $cultivo = Cultivo::with(['consumos.detalles.insumo', 'cosechas.facturas', 'planes.detalles'])->findOrFail($cultivo_id);
+        $relations = ['consumos.detalles.insumo', 'cosechas', 'planes.detalles'];
+
+        if ($this->cosechaFacturasDisponible()) {
+            $relations[] = 'cosechas.facturas';
+        }
+
+        $cultivo = Cultivo::with($relations)->findOrFail($cultivo_id);
+
+        if (! $this->cosechaFacturasDisponible()) {
+            $cultivo->cosechas->each(function ($cosecha) {
+                $cosecha->setRelation('facturas', collect());
+            });
+        }
 
         $plan = $cultivo->planes->sortByDesc('fecha_plan')->first();
         $planDetalles = $plan ? $plan->detalles : collect();
@@ -195,6 +208,61 @@ class ReporteController extends Controller
             'planPaginas',
             'consumoItems'
         ));
+    }
+
+    public function categoriaDetalle(Request $request, int $cultivo_id)
+    {
+        $cultivo = Cultivo::with(['consumos.detalles.insumo', 'planes.detalles'])->findOrFail($cultivo_id);
+
+        $categoria = trim((string) $request->query('categoria', ''));
+
+        if ($categoria === '') {
+            abort(422, 'La categoria es requerida.');
+        }
+
+        $categoriaNormalizada = $this->normalizarCategoriaReporte($categoria);
+        $plan = $cultivo->planes->sortByDesc('fecha_plan')->first();
+        $planDetallesCategoria = collect($plan?->detalles ?? [])
+            ->filter(fn ($detalle) => $this->normalizarCategoriaReporte($detalle->categoria) === $categoriaNormalizada)
+            ->sortBy([['semana', 'asc'], ['descripcion', 'asc']])
+            ->values();
+
+        $consumosCategoria = $cultivo->consumos
+            ->sortByDesc('fecha_consumo')
+            ->flatMap(function ($consumo) use ($cultivo, $categoriaNormalizada) {
+                $semanaCultivo = $cultivo->calcularSemanaCultivoParaFecha($consumo->fecha_consumo) ?? 'Sin semana';
+                $esManoDeObra = $categoriaNormalizada === 'Mano de Obra';
+
+                return $consumo->detalles
+                    ->filter(fn ($detalle) => $this->normalizarCategoriaReporte($detalle->categoria) === $categoriaNormalizada)
+                    ->map(function ($detalle) use ($consumo, $semanaCultivo, $esManoDeObra) {
+                        return (object) [
+                            'consumo_id' => $consumo->id,
+                            'semana_cultivo' => $semanaCultivo,
+                            'fecha_consumo' => $consumo->fecha_consumo,
+                            'insumo' => $esManoDeObra
+                                ? ($detalle->descripcion ?: 'Mano de Obra')
+                                : ($detalle->insumo->nombre ?? $detalle->descripcion ?? '-'),
+                            'descripcion' => $detalle->descripcion,
+                            'cantidad' => (float) $detalle->cantidad,
+                            'unidad_medida' => $detalle->unidad_medida,
+                            'subtotal' => (float) $detalle->subtotal,
+                        ];
+                    });
+            })
+            ->values();
+
+        return view('modules.reporteria.cultivo_categoria_show', [
+            'cultivo' => $cultivo,
+            'categoria' => $categoriaNormalizada,
+            'plan' => $plan,
+            'planDetallesCategoria' => $planDetallesCategoria,
+            'consumosCategoria' => $consumosCategoria,
+            'planCantidadTotal' => (float) $planDetallesCategoria->sum('cantidad_estimada'),
+            'planCostoTotal' => (float) $planDetallesCategoria->sum('subtotal'),
+            'realCantidadTotal' => (float) $consumosCategoria->sum('cantidad'),
+            'realCostoTotal' => (float) $consumosCategoria->sum('subtotal'),
+        ]);
     }
 
     private function paginateGroupedWeeks(mixed $items, callable $weekResolver, int $weeksPerPage = 4)
@@ -386,6 +454,11 @@ class ReporteController extends Controller
         ));
 
         return $pdf->download("historial_cultivo_{$cultivo->id}.pdf");
+    }
+
+    private function cosechaFacturasDisponible(): bool
+    {
+        return Schema::hasTable('cosecha_facturas');
     }
 
     private function normalizarCategoriaReporte(mixed $categoria): string

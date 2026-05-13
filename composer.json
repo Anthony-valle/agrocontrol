@@ -7,9 +7,12 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "barryvdh/laravel-dompdf": "^3.1",
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1",
-        "maatwebsite/excel": "^3.1"
+        "maatwebsite/excel": "^3.1",
+        "phpoffice/phpspreadsheet": "^1.30",
+        "predis/predis": "^3.2"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
@@ -31,6 +34,17 @@
             "Masterminds\\": "vendor/masterminds/html5/src/",
             "Svg\\": "vendor/dompdf/php-svg-lib/src/Svg/"
         },
+        "exclude-from-classmap": [
+            "app/Http/Controllers/EmpresaController copy.php",
+            "app/Http/Controllers/MoviemientoInventarioController.php",
+            "app/Http/Controllers/Productos_2.php",
+            "app/Http/Controllers/______.php",
+            "app/Models/InsumosImport.php",
+            "app/Models/insumo_salidas.php",
+            "app/Models/inventario_bodega.php",
+            "app/Models/Producto_2.php",
+            "storage/app/tmp_restore_check/**"
+        ],
         "files": [
             "app/Support/helpers.php"
         ],
@@ -55,6 +69,20 @@
         "dev": [
             "Composer\\Config::disableProcessTimeout",
             "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1\" \"php artisan pail --timeout=0\" \"npm run dev\" --names=server,queue,logs,vite --kill-others"
+        ],
+        "optimize": [
+            "@php artisan config:cache --ansi",
+            "@php artisan route:cache --ansi",
+            "@php artisan view:cache --ansi",
+            "@php artisan event:cache --ansi"
+        ],
+        "health": [
+            "@php artisan about --ansi"
+        ],
+        "deploy": [
+            "@php artisan migrate --force --ansi",
+            "@php artisan optimize:clear --ansi",
+            "@composer optimize"
         ],
         "test": [
             "@php artisan config:clear --ansi",

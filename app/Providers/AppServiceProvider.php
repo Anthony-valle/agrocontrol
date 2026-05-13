@@ -88,7 +88,6 @@ class AppServiceProvider extends ServiceProvider
 
         return Notificaciones::query()
             ->where('user_id', $user->id)
-            ->where('leido', false)
             ->orderByDesc('created_at')
             ->take(10)
             ->get();

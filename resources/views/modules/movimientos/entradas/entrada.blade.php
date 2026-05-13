@@ -191,7 +191,9 @@
 
 <div class="modal fade" id="modalImportarEntrada" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content" id="modalContentImportarEntrada"></div>
+        <div class="modal-content" id="modalContentImportarEntrada">
+            @include('modules.movimientos.entradas.importar_excel')
+        </div>
     </div>
 </div>
 
@@ -335,9 +337,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     bootstrap.Modal.getInstance(modalElement)?.hide();
                     Swal.close();
 
+                    const defaultHtml = data.queued
+                        ? '<p class="mb-0">La importacion fue enviada a la cola y se procesara en segundo plano.</p>'
+                        : '<p class="mb-0">La importacion finalizo correctamente.</p>';
+                    const successPrefix = data.success ? `<p class="mb-2">${data.success}</p>` : '';
+
                     Swal.fire({
-                        title: 'Carga masiva completada',
-                        html: data.summary_html || '<p class="mb-0">La importacion finalizo correctamente.</p>',
+                        title: data.title || (data.queued ? 'Carga masiva en cola' : 'Carga masiva completada'),
+                        html: `${successPrefix}${data.summary_html || defaultHtml}`,
                         icon: 'success',
                     }).then(() => {
                         window.location.href = data.redirect || '{{ route('movimientos.index') }}';
@@ -487,27 +494,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
 
-                fetch("{{ route('movimientos.entrada.importar') }}", {
-                    headers: {
-                        Accept: 'text/html',
-                    },
-                })
-                    .then((response) => {
-                        if (!response.ok) {
-                            throw new Error('No se pudo abrir el formulario de carga masiva.');
-                        }
-
-                        return response.text();
-                    })
-                    .then((html) => {
-                        document.getElementById('modalContentImportarEntrada').innerHTML = html;
-                        const modalElement = document.getElementById('modalImportarEntrada');
-                        new bootstrap.Modal(modalElement).show();
-                        bindImportForm();
-                    })
-                    .catch((error) => {
-                        Swal.fire('Error', error.message || 'No se pudo abrir la carga masiva.', 'error');
-                    });
+                const modalElement = document.getElementById('modalImportarEntrada');
+                bindImportForm();
+                new bootstrap.Modal(modalElement).show();
             });
         });
     }

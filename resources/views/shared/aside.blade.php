@@ -206,6 +206,12 @@
                         <span>Reporte de Inventario</span>
                     </a>
                 </li>
+                <li>
+                    <a href="{{ route('reporteria.facturas_entradas') }}">
+                        <i class="bi bi-paperclip fs-6 me-2"></i>
+                        <span>Facturas de Entradas</span>
+                    </a>
+                </li>
                 @endif
 
                 @if(auth()->user()->hasAccess('labores'))
@@ -263,7 +269,12 @@
                 @if(auth()->user()->hasAccess('cosecha'))
                 <li>
                     <a href="{{ route('cosecha.index')}}">
-                        <i class="bi bi-basket2 fs-6 me-2"></i><span>Cosecha Cultivo</span>
+                        <i class="bi bi-basket2 fs-6 me-2"></i><span>Gestión de Cosechas</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ route('cosecha.facturadas.index') }}">
+                        <i class="bi bi-receipt-cutoff fs-6 me-2"></i><span>Facturar Cosechas</span>
                     </a>
                 </li>
                 @endif

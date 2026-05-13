@@ -114,14 +114,12 @@
                                 $detallesPreview = $consumo->detalles
                                     ->map(function ($detalle) {
                                         $categoria = trim((string) ($detalle->categoria ?? ''));
-                                        $nombre = trim((string) ($detalle->insumo->nombre ?? $detalle->descripcion ?? '-'));
 
                                         return [
                                             'categoria' => $categoria !== '' ? $categoria : 'General',
-                                            'nombre' => $nombre !== '' ? $nombre : '-',
                                         ];
                                     })
-                                    ->unique(fn ($item) => strtolower($item['categoria'] . '|' . $item['nombre']))
+                                    ->unique(fn ($item) => strtolower($item['categoria']))
                                     ->values();
                             @endphp
                             <tr>
@@ -132,7 +130,7 @@
                                     <div class="reporte-consumo-detalle-lista">
                                         @forelse($detallesPreview->take(3) as $detalle)
                                             <div class="reporte-consumo-detalle-item">
-                                                <strong>{{ $detalle['categoria'] }}:</strong> {{ $detalle['nombre'] }}
+                                                <strong>{{ $detalle['categoria'] }}</strong>
                                             </div>
                                         @empty
                                             <div class="reporte-consumo-detalle-item">-</div>

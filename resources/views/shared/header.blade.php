@@ -166,38 +166,6 @@ function actualizarEstadoVisualNotificaciones() {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-  const entries = Array.from(document.querySelectorAll('.notification-item'));
-
-  entries.forEach(function (entry) {
-    const createdAt = entry.dataset.createdAt;
-    if (!createdAt) {
-      return;
-    }
-
-    const createdTime = new Date(createdAt).getTime();
-    if (Number.isNaN(createdTime)) {
-      return;
-    }
-
-    const hideAfterMs = (createdTime + 15000) - Date.now();
-
-    const ocultar = function () {
-      entry.style.display = 'none';
-      const divider = entry.nextElementSibling;
-      if (divider && divider.classList.contains('dropdown-divider')) {
-        divider.style.display = 'none';
-      }
-      actualizarEstadoVisualNotificaciones();
-    };
-
-    if (hideAfterMs <= 0) {
-      ocultar();
-      return;
-    }
-
-    window.setTimeout(ocultar, hideAfterMs);
-  });
-
   actualizarEstadoVisualNotificaciones();
 });
 </script>

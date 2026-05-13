@@ -68,8 +68,8 @@
             <div class="card-body">
                 <h5 class="card-title pb-0">Registro de Notificaciones</h5>
 
-                <form method="GET" action="{{ route('notificaciones.index') }}" class="d-flex flex-wrap justify-content-between align-items-center mb-3 p-2 bg-light rounded shadow-sm gap-3">
-                    <div class="d-flex align-items-center gap-3 flex-wrap">
+                <form method="GET" action="{{ route('notificaciones.index') }}" class="d-flex flex-wrap flex-md-nowrap align-items-center mb-3 p-2 bg-light rounded shadow-sm gap-3">
+                    <div class="d-flex align-items-center gap-3 flex-wrap flex-md-nowrap grow">
                         <div class="d-flex align-items-center gap-2">
                             <select name="per_page" id="notificacionesPerPage" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
                                 <option value="5" {{ (int) $perPage === 5 ? 'selected' : '' }}>5</option>
@@ -81,7 +81,7 @@
                             <small class="text-muted text-nowrap">registros</small>
                         </div>
 
-                        <div class="input-group input-group-sm" style="max-width: 280px;">
+                        <div class="input-group input-group-sm grow" style="max-width: 280px;">
                             <span class="input-group-text bg-white border-end-0">
                                 <i class="fa-solid fa-magnifying-glass text-muted"></i>
                             </span>
@@ -89,7 +89,7 @@
                         </div>
                     </div>
 
-                    <div class="d-flex gap-2">
+                    <div class="d-flex gap-2 shrink-0 ms-md-auto">
                         <button type="submit" class="btn btn-primary btn-sm shadow-sm">
                             <i class="fa-solid fa-filter me-1"></i> Filtrar
                         </button>
@@ -100,23 +100,6 @@
                         @endif
                     </div>
                 </form>
-
-                @if(($resumenTipos ?? collect())->isNotEmpty())
-                    <div class="row g-3 mb-3">
-                        @foreach($resumenTipos as $resumen)
-                            <div class="col-12 col-md-6 col-xl-3">
-                                <div class="notification-summary-card">
-                                    <div class="notification-summary-label">Categoría</div>
-                                    <div class="notification-summary-value">{{ $resumen['label'] }}</div>
-                                    <div class="notification-meta mt-2">
-                                        <span>{{ $resumen['total'] }} registros</span>
-                                    </div>
-                                    <div class="notification-summary-date">Última notificación: {{ optional($resumen['ultima_fecha'])->format('d/m/Y H:i') ?? '-' }}</div>
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-                @endif
 
                 <div class="table-responsive border rounded">
                     <table class="table table-hover w-100 mb-0" id="tablaNotificaciones">

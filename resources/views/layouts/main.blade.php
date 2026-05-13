@@ -104,6 +104,63 @@
   <script src="{{ asset('NiceAdmin/assets/js/main.js')}}"></script>
 
   <script>
+    window.AgroPermissions = {
+      canManageSensitiveActions: @json(auth()->user()?->canManageSensitiveActions() ?? false)
+    };
+
+    (function () {
+      if (window.AgroPermissions.canManageSensitiveActions) {
+        return;
+      }
+
+      const deleteSelectors = [
+        '[class*="btnEliminar"]',
+        '.btnEliminarFacturaVenta',
+        'form[data-sensitive-delete="1"]',
+        'button[data-sensitive-delete="1"]',
+        'a[data-sensitive-delete="1"]'
+      ];
+
+      function mostrarAccesoDenegado() {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Acceso denegado',
+          text: 'No tienes acceso para eliminar registros.',
+          confirmButtonText: 'Aceptar'
+        });
+      }
+
+      document.addEventListener('click', function (event) {
+        const deleteButton = event.target.closest(deleteSelectors.join(','));
+        if (!deleteButton) {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        mostrarAccesoDenegado();
+      }, true);
+
+      document.addEventListener('submit', function (event) {
+        const form = event.target;
+        if (!(form instanceof HTMLFormElement)) {
+          return;
+        }
+
+        const methodInput = form.querySelector('input[name="_method"]');
+        const isDelete = methodInput && String(methodInput.value || '').toUpperCase() === 'DELETE';
+        const markedDelete = form.matches('form[data-sensitive-delete="1"]');
+
+        if (!isDelete && !markedDelete) {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        mostrarAccesoDenegado();
+      });
+    })();
+
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function () {
         navigator.serviceWorker.register('/sw.js?v=20260511-2').catch(function (error) {
