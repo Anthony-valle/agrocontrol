@@ -32,32 +32,70 @@ class CultivoHistorialDetailsSheet implements FromArray, ShouldAutoSize, WithDra
 
     public function array(): array
     {
-        $rows = $this->consumos->sortByDesc('fecha_consumo')->flatMap(function ($consumo) {
+        $rows = $this->buildRows()->all();
+
+        return array_merge([
+            ['Reporte de Consumos - ' . $this->cultivo->nombre],
+            ['Generado', now()->format('d/m/Y H:i')],
+            ['Fecha', 'Lote', 'Cultivo', 'Categoria', 'Codigo', 'Insumo', 'Concepto', 'Lote consumido', 'Ingrediente activo', 'Cantidad', 'Unidad', 'Subtotal'],
+        ], $rows, [[
+            '', '', '', '', '', '', '', '', '', '', 'TOTAL', (float) $this->consumos->flatMap(fn ($consumo) => $consumo->detalles)->sum('subtotal'),
+        ]]);
+    }
+
+    private function buildRows(): Collection
+    {
+        return $this->consumos->flatMap(function ($consumo) {
             return $consumo->detalles->map(function ($detalle) use ($consumo) {
                 $insumo = $detalle->insumo;
+                $categoria = $this->normalizarCategoria((string) ($detalle->categoria ?? ''));
+                $esRegistroConceptual = mb_strtolower($categoria) === 'mano de obra' || !$insumo;
+                $descripcion = trim((string) ($detalle->descripcion ?? ''));
 
                 return [
+                    'categoria_orden' => mb_strtolower($categoria),
+                    'fecha_orden' => $consumo->fecha_consumo ? \Carbon\Carbon::parse($consumo->fecha_consumo)->format('Y-m-d') : '',
                     $consumo->fecha_consumo ? \Carbon\Carbon::parse($consumo->fecha_consumo)->format('d/m/Y') : '-',
                     optional($this->cultivo->lote)->nombre ?? '-',
                     $this->cultivo->nombre,
-                    $insumo->codigo ?? '-',
-                    $insumo->nombre ?? ($detalle->descripcion ?: '-'),
-                    $detalle->lote ?: '-',
-                    $insumo->ingrediente_activo ?? $insumo->ingredientes_activo ?? '-',
+                    $categoria,
+                    $esRegistroConceptual ? '-' : ($insumo->codigo ?? '-'),
+                    $esRegistroConceptual ? '-' : ($insumo->nombre ?? '-'),
+                    $descripcion !== '' ? $descripcion : '-',
+                    $esRegistroConceptual ? '-' : ($detalle->lote ?: '-'),
+                    $esRegistroConceptual ? '-' : ($insumo->ingrediente_activo ?? $insumo->ingredientes_activo ?? '-'),
                     (float) ($detalle->cantidad ?? 0),
                     $detalle->unidad_medida ?? $insumo->unidad_medida ?? '-',
                     (float) ($detalle->subtotal ?? 0),
                 ];
             });
-        })->values()->all();
+        })->sort(function (array $left, array $right) {
+            $categoria = strcmp($left['categoria_orden'], $right['categoria_orden']);
+            if ($categoria !== 0) {
+                return $categoria;
+            }
 
-        return array_merge([
-            ['Reporte de Consumos - ' . $this->cultivo->nombre],
-            ['Generado', now()->format('d/m/Y H:i')],
-            ['Fecha', 'Lote', 'Cultivo', 'Codigo', 'Insumo / Concepto', 'Lote consumido', 'Ingrediente activo', 'Cantidad', 'Unidad', 'Subtotal'],
-        ], $rows, [[
-            '', '', '', '', '', '', '', '', 'TOTAL', (float) $this->consumos->flatMap(fn ($consumo) => $consumo->detalles)->sum('subtotal'),
-        ]]);
+            return strcmp($right['fecha_orden'], $left['fecha_orden']);
+        })->values()->map(function (array $row) {
+            unset($row['categoria_orden'], $row['fecha_orden']);
+
+            return array_values($row);
+        });
+    }
+
+    private function normalizarCategoria(string $categoria): string
+    {
+        $categoria = trim($categoria);
+
+        if ($categoria === '') {
+            return 'Otros Insumos';
+        }
+
+        if (mb_strtolower($categoria) === 'mano de obra') {
+            return 'Mano de Obra';
+        }
+
+        return $categoria;
     }
 
     public function title(): string
@@ -120,8 +158,8 @@ class CultivoHistorialDetailsSheet implements FromArray, ShouldAutoSize, WithDra
                 $sheet = $event->sheet->getDelegate();
                 $totalRow = 4 + $this->consumos->flatMap(fn ($consumo) => $consumo->detalles)->count();
 
-                $sheet->mergeCells('B1:J1');
-                $sheet->mergeCells('B2:J2');
+                $sheet->mergeCells('B1:L1');
+                $sheet->mergeCells('B2:L2');
                 $sheet->setCellValue('A1', '');
                 $sheet->setCellValue('A2', '');
                 $sheet->setCellValue('B1', 'Reporte de Consumos - ' . $this->cultivo->nombre);
@@ -131,7 +169,7 @@ class CultivoHistorialDetailsSheet implements FromArray, ShouldAutoSize, WithDra
                 $sheet->getRowDimension(1)->setRowHeight(48);
                 $sheet->getRowDimension(2)->setRowHeight(24);
 
-                $sheet->getStyle("A3:J{$totalRow}")->applyFromArray([
+                $sheet->getStyle("A3:L{$totalRow}")->applyFromArray([
                     'borders' => [
                         'allBorders' => [
                             'borderStyle' => Border::BORDER_THIN,
@@ -143,13 +181,13 @@ class CultivoHistorialDetailsSheet implements FromArray, ShouldAutoSize, WithDra
                     ],
                 ]);
 
-                $sheet->getStyle('H4:H' . $totalRow)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER_00);
                 $sheet->getStyle('J4:J' . $totalRow)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER_00);
-                $sheet->getStyle('H4:H' . $totalRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                $sheet->getStyle('L4:L' . $totalRow)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER_00);
                 $sheet->getStyle('J4:J' . $totalRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-                $sheet->getStyle('A1:J2')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
-                $sheet->getStyle('B1:J1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
-                $sheet->getStyle('B2:J2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+                $sheet->getStyle('L4:L' . $totalRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                $sheet->getStyle('A1:L2')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+                $sheet->getStyle('B1:L1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+                $sheet->getStyle('B2:L2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
             },
         ];
     }
