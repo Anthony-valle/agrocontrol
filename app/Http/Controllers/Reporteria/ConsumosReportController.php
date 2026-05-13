@@ -9,18 +9,33 @@ use App\Models\Cultivo;
 use App\Models\Lote;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Maatwebsite\Excel\Facades\Excel;
 
 class ConsumosReportController extends Controller
 {
+    private const REGISTROS_POR_PAGINA = 10;
+
     public function index(Request $request)
     {
         $lotes = Lote::orderBy('nombre')->get(['id', 'nombre']);
         $cultivos = Cultivo::orderBy('nombre')->get(['id', 'nombre', 'lotes_id']);
+        $hayFiltros = $request->filled('lote_id')
+            || $request->filled('cultivo_id')
+            || $request->filled('fecha_inicio')
+            || $request->filled('fecha_fin');
 
-        $query = $this->baseQuery($request);
-        $consumosMetricas = (clone $query)->get();
-        $consumos = $query->paginate(25)->withQueryString();
+        if ($hayFiltros) {
+            $query = $this->baseQuery($request);
+            $consumosMetricas = (clone $query)->get();
+            $consumos = $query->paginate(self::REGISTROS_POR_PAGINA)->withQueryString();
+        } else {
+            $consumosMetricas = collect();
+            $consumos = new LengthAwarePaginator([], 0, self::REGISTROS_POR_PAGINA, 1, [
+                'path' => route('reporteria.consumos'),
+                'pageName' => 'page',
+            ]);
+        }
 
         $metricas = [
             'registros' => $consumosMetricas->count(),
@@ -29,7 +44,7 @@ class ConsumosReportController extends Controller
             'promedio' => $consumosMetricas->count() > 0 ? (float) $consumosMetricas->avg('total') : 0,
         ];
 
-        return view('modules.reporteria.consumos', compact('lotes', 'cultivos', 'consumos', 'metricas'));
+        return view('modules.reporteria.consumos', compact('lotes', 'cultivos', 'consumos', 'metricas', 'hayFiltros'));
     }
 
     public function exportExcel(Request $request)

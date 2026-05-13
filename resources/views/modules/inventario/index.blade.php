@@ -146,45 +146,8 @@
 
             </div>
 
-            <div class="d-flex flex-wrap justify-content-between align-items-center mt-3 gap-2" id="inventarioPaginacionWrap">
-                <small class="text-muted">
-                    @if($inventarios->total() > 0)
-                        Mostrando {{ $inventarios->firstItem() }}-{{ $inventarios->lastItem() }} de {{ $inventarios->total() }} registros | Hoja {{ $inventarios->currentPage() }} de {{ $inventarios->lastPage() }}
-                    @else
-                        No hay registros para mostrar.
-                    @endif
-                </small>
-
-                @if($inventarios->lastPage() > 1)
-                    @php
-                        $maxPaginasVisibles = 6;
-                        $paginaActual = $inventarios->currentPage();
-                        $ultimaPagina = $inventarios->lastPage();
-                        $inicioPagina = max(1, $paginaActual - intdiv($maxPaginasVisibles - 1, 2));
-                        $finPagina = min($ultimaPagina, $inicioPagina + $maxPaginasVisibles - 1);
-
-                        if (($finPagina - $inicioPagina + 1) < $maxPaginasVisibles) {
-                            $inicioPagina = max(1, $finPagina - $maxPaginasVisibles + 1);
-                        }
-                    @endphp
-                    <nav aria-label="Paginacion de inventario">
-                        <ul class="pagination pagination-sm mb-0">
-                            <li class="page-item {{ $inventarios->onFirstPage() ? 'disabled' : '' }}">
-                                <a class="page-link" href="{{ $inventarios->onFirstPage() ? '#' : $inventarios->previousPageUrl() }}">Anterior</a>
-                            </li>
-
-                            @for($page = $inicioPagina; $page <= $finPagina; $page++)
-                                <li class="page-item {{ $page === $inventarios->currentPage() ? 'active' : '' }}">
-                                    <a class="page-link" href="{{ $inventarios->url($page) }}">{{ $page }}</a>
-                                </li>
-                            @endfor
-
-                            <li class="page-item {{ $inventarios->hasMorePages() ? '' : 'disabled' }}">
-                                <a class="page-link" href="{{ $inventarios->hasMorePages() ? $inventarios->nextPageUrl() : '#' }}">Siguiente</a>
-                            </li>
-                        </ul>
-                    </nav>
-                @endif
+            <div id="inventarioPaginacionWrap">
+                @include('shared.table_pagination_footer', ['paginator' => $inventarios, 'ariaLabel' => 'Paginacion de inventario'])
             </div>
 
         </div>

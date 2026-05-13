@@ -31,6 +31,103 @@
         border-radius: 0.8rem;
         border: 1px solid #dbe3ef;
     }
+
+    .lote-rpt-map--compact {
+        height: 320px;
+    }
+
+    .lote-rpt-map-shell {
+        position: relative;
+        overflow: hidden;
+        border-radius: 0.95rem;
+    }
+
+    .lote-rpt-map-overlay {
+        position: absolute;
+        top: 0.9rem;
+        left: 0.9rem;
+        z-index: 500;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        pointer-events: none;
+    }
+
+    .lote-rpt-map-chip {
+        background: rgba(255, 255, 255, 0.94);
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 0.85rem;
+        padding: 0.55rem 0.75rem;
+        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+        min-width: 120px;
+    }
+
+    .lote-rpt-map-chip small {
+        display: block;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #64748b;
+        margin-bottom: 0.2rem;
+    }
+
+    .lote-rpt-map-chip strong {
+        font-size: 1rem;
+        color: #0f172a;
+    }
+
+    .lote-rpt-map-note {
+        font-size: 0.85rem;
+        color: #64748b;
+    }
+
+    .lote-rpt-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.85rem;
+    }
+
+    .lote-rpt-legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.35rem 0.65rem;
+        border-radius: 999px;
+        background: #fff;
+        border: 1px solid #dbe3ef;
+        font-size: 0.8rem;
+        color: #475569;
+    }
+
+    .lote-rpt-legend-color {
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        display: inline-block;
+        border: 1px solid rgba(15, 23, 42, 0.2);
+    }
+
+    .lote-rpt-vertex-label {
+        background: transparent;
+        border: 0;
+        box-shadow: none;
+        color: #111827;
+        font-size: 0.72rem;
+        font-weight: 700;
+    }
+
+    @media (max-width: 767.98px) {
+        .lote-rpt-map-overlay {
+            position: static;
+            margin-bottom: 0.75rem;
+        }
+
+        .lote-rpt-map {
+            height: 300px;
+        }
+    }
 </style>
 
 <div class="card shadow-sm border-0 lote-rpt-shell">
@@ -101,10 +198,35 @@
                 <div class="col-12 col-lg-5">
                     <div class="card border-0 shadow-sm h-100">
                         <div class="card-header bg-white border-0 pb-0">
-                            <h6 class="mb-0 fw-bold text-secondary">Grafico de participacion</h6>
+                            <h6 class="mb-0 fw-bold text-secondary">Lote mapeado</h6>
                         </div>
-                        <div class="card-body d-flex flex-column align-items-center justify-content-center">
-                            <canvas id="graficoCultivosLote" height="220"></canvas>
+                        <div class="card-body pt-3">
+                            @if(is_array($poligono) && count($poligono) && is_array($poligono[0]) && count($poligono[0]) >= 2 && is_scalar($poligono[0][0]) && is_scalar($poligono[0][1]))
+                                <div class="lote-rpt-map-shell">
+                                    <div class="lote-rpt-map-overlay">
+                                        <div class="lote-rpt-map-chip">
+                                            <small>Mapeado</small>
+                                            <strong>{{ agro_number($areaOcupada, 2) }} Ha</strong>
+                                        </div>
+                                        <div class="lote-rpt-map-chip">
+                                            <small>Libre</small>
+                                            <strong>{{ agro_number($areaDisponible, 2) }} Ha</strong>
+                                        </div>
+                                    </div>
+                                    <div id="mapaLoteResumen" class="lote-rpt-map lote-rpt-map--compact"></div>
+                                </div>
+                                <div class="lote-rpt-legend">
+                                    <span class="lote-rpt-legend-item"><span class="lote-rpt-legend-color" style="background:#ffeb3b"></span> Poligono mapeado del lote</span>
+                                    <span class="lote-rpt-legend-item"><span class="lote-rpt-legend-color" style="background:#16a34a"></span> Area ocupada: {{ agro_number($areaOcupada, 2) }} Ha</span>
+                                    <span class="lote-rpt-legend-item"><span class="lote-rpt-legend-color" style="background:#cbd5e1"></span> Disponible: {{ agro_number($areaDisponible, 2) }} Ha</span>
+                                </div>
+                                <div class="lote-rpt-map-note mt-2">Se muestra el dibujo real del lote mapeado. Los cultivos activos se resumen por area porque no tienen poligonos individuales guardados.</div>
+                            @else
+                                <div class="d-flex flex-column align-items-center justify-content-center h-100 text-center py-4">
+                                    <div class="text-muted mb-2">Este lote no tiene un poligono mapeado guardado.</div>
+                                    <canvas id="graficoCultivosLote" height="220"></canvas>
+                                </div>
+                            @endif
                         </div>
                     </div>
                 </div>
@@ -163,7 +285,24 @@
                     <h6 class="mb-0 fw-bold text-secondary">Mapa del lote</h6>
                 </div>
                 <div class="card-body pt-3">
-                    <div id="mapaLote" class="lote-rpt-map"></div>
+                    <div class="lote-rpt-map-shell">
+                        <div class="lote-rpt-map-overlay">
+                            <div class="lote-rpt-map-chip">
+                                <small>Area</small>
+                                <strong id="mapaLoteArea">{{ agro_number($areaTotal, 2) }} Ha</strong>
+                            </div>
+                            <div class="lote-rpt-map-chip">
+                                <small>Perimetro</small>
+                                <strong id="mapaLotePerimetro">0.00 m</strong>
+                            </div>
+                            <div class="lote-rpt-map-chip">
+                                <small>Puntos</small>
+                                <strong id="mapaLotePuntos">0</strong>
+                            </div>
+                        </div>
+                        <div id="mapaLote" class="lote-rpt-map"></div>
+                    </div>
+                    <div class="lote-rpt-map-note mt-2">El poligono del lote se carga automaticamente con medicion visual de area y perimetro.</div>
                 </div>
             </div>
         @endif
@@ -172,6 +311,72 @@
 
 <script>
     function initLoteCultivosPartial() {
+        function computeGeodesicAreaMeters(points) {
+            if (!Array.isArray(points) || points.length < 3) {
+                return 0;
+            }
+
+            const radius = 6378137;
+            let area = 0;
+
+            for (let index = 0; index < points.length; index++) {
+                const current = points[index];
+                const next = points[(index + 1) % points.length];
+                const lon1 = current.lng * Math.PI / 180;
+                const lon2 = next.lng * Math.PI / 180;
+                const lat1 = current.lat * Math.PI / 180;
+                const lat2 = next.lat * Math.PI / 180;
+
+                area += (lon2 - lon1) * (2 + Math.sin(lat1) + Math.sin(lat2));
+            }
+
+            return Math.abs(area * radius * radius / 2);
+        }
+
+        function computePerimeterMeters(points) {
+            if (!Array.isArray(points) || points.length < 2) {
+                return 0;
+            }
+
+            const radius = 6371000;
+            let total = 0;
+
+            for (let index = 0; index < points.length; index++) {
+                const current = points[index];
+                const next = points[(index + 1) % points.length];
+                const lat1 = current.lat * Math.PI / 180;
+                const lat2 = next.lat * Math.PI / 180;
+                const deltaLat = (next.lat - current.lat) * Math.PI / 180;
+                const deltaLng = (next.lng - current.lng) * Math.PI / 180;
+                const haversine = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2)
+                    + Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLng / 2) * Math.sin(deltaLng / 2);
+                total += 2 * radius * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+            }
+
+            return total;
+        }
+
+        function actualizarMetricasMapa(points) {
+            const areaNode = document.getElementById('mapaLoteArea');
+            const perimetroNode = document.getElementById('mapaLotePerimetro');
+            const puntosNode = document.getElementById('mapaLotePuntos');
+            const totalPuntos = Array.isArray(points) ? points.length : 0;
+            const areaHa = totalPuntos >= 3 ? computeGeodesicAreaMeters(points) / 10000 : 0;
+            const perimetroM = totalPuntos >= 2 ? computePerimeterMeters(points) : 0;
+
+            if (areaNode) {
+                areaNode.textContent = `${areaHa.toFixed(2)} Ha`;
+            }
+
+            if (perimetroNode) {
+                perimetroNode.textContent = `${perimetroM.toFixed(2)} m`;
+            }
+
+            if (puntosNode) {
+                puntosNode.textContent = String(totalPuntos);
+            }
+        }
+
         @if(count($cultivosData))
             const ctx = document.getElementById('graficoCultivosLote');
             if (ctx && typeof Chart !== 'undefined') {
@@ -211,34 +416,67 @@
 
         @if(is_array($poligono) && count($poligono) && is_array($poligono[0]) && count($poligono[0]) >= 2 && is_scalar($poligono[0][0]) && is_scalar($poligono[0][1]))
             if (typeof L !== 'undefined') {
-                const mapContainer = document.getElementById('mapaLote');
-                if (mapContainer && !mapContainer.dataset.initialized) {
+                const coords = @json($poligono);
+                const baseCoords = Array.isArray(coords) && Array.isArray(coords[0]) && Array.isArray(coords[0][0]) ? coords[0] : coords;
+                const puntosPoligono = Array.isArray(baseCoords)
+                    ? baseCoords
+                          .filter((c) => Array.isArray(c) && c.length >= 2)
+                          .map((c) => ({ lat: Number(c[1]), lng: Number(c[0]) }))
+                    : [];
+                const latlngs = puntosPoligono.map((c) => [c.lat, c.lng]);
+
+                function inicializarMapaLote(elementId, actualizarPanelMetricas = false) {
+                    const mapContainer = document.getElementById(elementId);
+
+                    if (!mapContainer || mapContainer.dataset.initialized || latlngs.length === 0) {
+                        return;
+                    }
+
                     mapContainer.dataset.initialized = 'true';
 
-                    const map = L.map('mapaLote').setView([{{ $lat }}, {{ $lng }}], 17);
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    const map = L.map(elementId).setView([{{ $lat }}, {{ $lng }}], 17);
+                    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
                         maxZoom: 20,
+                        attribution: '&copy; Esri',
                     }).addTo(map);
 
-                    const coords = @json($poligono);
-                    const baseCoords = Array.isArray(coords) && Array.isArray(coords[0]) && Array.isArray(coords[0][0]) ? coords[0] : coords;
-                    const latlngs = Array.isArray(baseCoords)
-                        ? baseCoords
-                              .filter((c) => Array.isArray(c) && c.length >= 2)
-                              .map((c) => [c[1], c[0]])
-                        : [];
+                    const polygon = L.polygon(latlngs, {
+                        color: '#ffeb3b',
+                        fillColor: '#ffeb3b',
+                        fillOpacity: 0.45,
+                        weight: 3,
+                    }).addTo(map);
 
-                    if (latlngs.length > 0) {
-                        L.polygon(latlngs, {
-                            color: '#1d4ed8',
-                            fillColor: '#4e79a7',
-                            fillOpacity: 0.35,
-                            weight: 3,
-                            dashArray: '6 4',
-                        }).addTo(map);
-                        map.fitBounds(latlngs);
+                    latlngs.forEach((point, index) => {
+                        L.circleMarker(point, {
+                            radius: 7,
+                            color: '#111827',
+                            weight: 2,
+                            fillColor: '#ffeb3b',
+                            fillOpacity: 1,
+                        }).addTo(map).bindTooltip(String(index + 1), {
+                            permanent: true,
+                            direction: 'center',
+                            className: 'lote-rpt-vertex-label',
+                            offset: [0, 0],
+                        });
+                    });
+
+                    if (actualizarPanelMetricas) {
+                        actualizarMetricasMapa(puntosPoligono);
                     }
+
+                    const areaHa = (computeGeodesicAreaMeters(puntosPoligono) / 10000).toFixed(2);
+                    const perimetroM = computePerimeterMeters(puntosPoligono).toFixed(2);
+                    polygon.bindTooltip(`Area: ${areaHa} Ha | Perimetro: ${perimetroM} m`, {
+                        sticky: true,
+                        direction: 'top',
+                    });
+                    map.fitBounds(latlngs);
                 }
+
+                inicializarMapaLote('mapaLoteResumen');
+                inicializarMapaLote('mapaLote', true);
             }
         @endif
     }

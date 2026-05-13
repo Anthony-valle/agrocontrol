@@ -1,7 +1,8 @@
 @extends('layouts.main')
 
 @section('contenido')
-<main id="main" class="main">
+<main id="main" class="main reporteria-shell">
+    @include('shared.reporteria_styles')
     <style>
         .report-table {
             table-layout: fixed;
@@ -72,14 +73,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-4 text-md-end">
-                <a href="{{ route('reporte.cultivo.historial.excel', $cultivo->id) }}" class="btn btn-success btn-sm me-2">
-                    <i class="fa-solid fa-file-excel"></i> Descargar Excel
-                </a>
-                <a href="{{ route('reporte.cultivo.historial.pdf', $cultivo->id) }}" target="_blank" class="btn btn-primary btn-sm">
-                    <i class="fa-solid fa-file-pdf"></i> Descargar PDF
-                </a>
-            </div>
+            <div class="col-md-4"></div>
         </div>
 
         <div class="row gy-3">
@@ -140,7 +134,7 @@
                             </select>
                         </div>
                     </div>
-                    <div class="d-flex gap-2">
+                    <div class="reporteria-actions">
                         <button type="submit" class="btn btn-primary">
                             <i class="fa-solid fa-filter me-1"></i> Filtrar
                         </button>
@@ -149,6 +143,12 @@
                                 <i class="fa-solid fa-eraser me-1"></i> Limpiar
                             </a>
                         @endif
+                        <a href="{{ route('reporte.cultivo.historial.excel', ['cultivo_id' => $cultivo->id] + request()->query()) }}" class="btn btn-success">
+                            <i class="bi bi-file-earmark-excel me-1"></i> Descargar Excel
+                        </a>
+                        <a href="{{ route('reporte.cultivo.historial.pdf', ['cultivo_id' => $cultivo->id] + request()->query()) }}" class="btn btn-danger">
+                            <i class="bi bi-file-earmark-pdf me-1"></i> Descargar PDF
+                        </a>
                     </div>
                 </form>
             </div>

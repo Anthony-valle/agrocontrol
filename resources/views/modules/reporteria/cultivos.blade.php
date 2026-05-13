@@ -3,14 +3,15 @@
 @section('titulo', 'Reportería de Cultivos')
 
 @section('contenido')
-<main id="main" class="main">
+<main id="main" class="main reporteria-shell">
+    @include('shared.reporteria_styles')
     <div class="pagetitle">
         <h1>Reportería de Cultivos</h1>
         <p class="text-muted mb-0">Análisis productivo, disponibilidad e impacto económico por cultivo.</p>
     </div>
 
     <section class="section">
-        <div class="card shadow-sm border-0 mb-4">
+        <div class="card shadow-sm border-0 mb-4 reporteria-filter-card">
             <div class="card-body p-4">
                 <form method="GET" action="{{ route('reporteria.cultivos') }}" class="row g-3 align-items-end">
                     <div class="col-md-4">
@@ -30,17 +31,17 @@
                             <option value="cerrado" {{ request('estado') === 'cerrado' ? 'selected' : '' }}>Cerrado</option>
                         </select>
                     </div>
-                    <div class="col-md-5 d-flex gap-2">
+                    <div class="col-md-5 reporteria-actions">
                         <button type="submit" class="btn btn-primary">Filtrar</button>
                         <a href="{{ route('reporteria.cultivos') }}" class="btn btn-outline-secondary">Limpiar</a>
-                        <a href="{{ route('reporteria.cultivos.excel', request()->query()) }}" class="btn btn-success">Excel</a>
-                        <a href="{{ route('reporteria.cultivos.pdf', request()->query()) }}" class="btn btn-danger">PDF</a>
+                        <a href="{{ route('reporteria.cultivos.excel', request()->query()) }}" class="btn btn-success"><i class="bi bi-file-earmark-excel me-1"></i>Descargar Excel</a>
+                        <a href="{{ route('reporteria.cultivos.pdf', request()->query()) }}" class="btn btn-danger"><i class="bi bi-file-earmark-pdf me-1"></i>Descargar PDF</a>
                     </div>
                 </form>
             </div>
         </div>
 
-        <div class="card shadow-sm border-0">
+        <div class="card shadow-sm border-0 reporteria-table-card">
             <div class="card-header bg-white border-0 pb-0"><h5 class="card-title mb-0">Índice de Reportes por Cultivo</h5></div>
             <div class="card-body pt-3">
                 <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 p-2 bg-light rounded shadow-sm gap-3">
@@ -63,7 +64,7 @@
                     </div>
                 </div>
 
-                <div class="table-responsive border rounded">
+                <div class="table-responsive border rounded reporteria-table-responsive">
                     <table class="table table-hover table-sm align-middle mb-0" id="tablaReporteriaCultivos" style="min-width: 1300px;">
                         <thead class="table-light">
                             <tr>

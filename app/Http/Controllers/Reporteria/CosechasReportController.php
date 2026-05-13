@@ -9,28 +9,53 @@ use App\Models\Cultivo;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Maatwebsite\Excel\Facades\Excel;
 
 class CosechasReportController extends Controller
 {
+    private const REGISTROS_POR_PAGINA = 10;
+
     public function index(Request $request)
     {
         $cultivos = Cultivo::orderBy('nombre')->get(['id', 'nombre', 'unidad_medida']);
+        $hayFiltros = $request->filled('cultivo_id')
+            || $request->filled('desde')
+            || $request->filled('hasta');
+        $cultivoSeleccionado = $request->filled('cultivo_id')
+            ? $cultivos->firstWhere('id', (int) $request->cultivo_id)
+            : null;
 
-        $cosechas = $this->cosechasFiltradas($request)->get();
+        if ($hayFiltros) {
+            $query = $this->cosechasFiltradas($request);
+            $cosechasMetricas = (clone $query)->get();
+            $cosechas = $query->paginate(self::REGISTROS_POR_PAGINA)->withQueryString();
+        } else {
+            $cosechasMetricas = collect();
+            $cosechas = new LengthAwarePaginator([], 0, self::REGISTROS_POR_PAGINA, 1, [
+                'path' => route('reporteria.cosechas'),
+                'pageName' => 'page',
+            ]);
+        }
+
+        $filtrosAplicados = [
+            'cultivo' => $cultivoSeleccionado?->nombre,
+            'desde' => $request->filled('desde') ? Carbon::parse($request->desde)->format('d/m/Y') : null,
+            'hasta' => $request->filled('hasta') ? Carbon::parse($request->hasta)->format('d/m/Y') : null,
+        ];
 
         $totales = [
-            'registros' => $cosechas->count(),
-            'bruta' => $cosechas->sum('cantidad_bruta'),
-            'descarte' => $cosechas->sum('descarte'),
-            'neta' => $cosechas->sum('cantidad_neta'),
-            'disponible' => $cosechas->sum('cantidad_disponible'),
-            'rendimiento' => $cosechas->sum('cantidad_bruta') > 0
-                ? ($cosechas->sum('cantidad_neta') / $cosechas->sum('cantidad_bruta')) * 100
+            'registros' => $cosechasMetricas->count(),
+            'bruta' => $cosechasMetricas->sum('cantidad_bruta'),
+            'descarte' => $cosechasMetricas->sum('descarte'),
+            'neta' => $cosechasMetricas->sum('cantidad_neta'),
+            'disponible' => $cosechasMetricas->sum('cantidad_disponible'),
+            'rendimiento' => $cosechasMetricas->sum('cantidad_bruta') > 0
+                ? ($cosechasMetricas->sum('cantidad_neta') / $cosechasMetricas->sum('cantidad_bruta')) * 100
                 : 0,
         ];
 
-        $resumenPorCultivo = $cosechas
+        $resumenPorCultivo = $cosechasMetricas
             ->groupBy(fn ($cosecha) => $cosecha->cultivo->nombre ?? 'Sin cultivo')
             ->map(function ($items, $nombreCultivo) {
                 $bruta = $items->sum('cantidad_bruta');
@@ -52,7 +77,7 @@ class CosechasReportController extends Controller
             ->sortByDesc('neta')
             ->values();
 
-        $resumenMensual = $cosechas
+        $resumenMensual = $cosechasMetricas
             ->groupBy(fn ($cosecha) => Carbon::parse($cosecha->fecha_cosecha)->format('Y-m'))
             ->map(function ($items, $periodo) {
                 $bruta = $items->sum('cantidad_bruta');
@@ -73,7 +98,9 @@ class CosechasReportController extends Controller
             'cosechas',
             'totales',
             'resumenPorCultivo',
-            'resumenMensual'
+            'resumenMensual',
+            'filtrosAplicados',
+            'hayFiltros'
         ));
     }
 

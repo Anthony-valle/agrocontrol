@@ -6,6 +6,7 @@ use App\Models\Bodega;
 use App\Models\InsumoEntrada;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
@@ -109,9 +110,47 @@ class FacturaInventarioController extends Controller
     public function show(InsumoEntrada $factura_inventario)
     {
         abort_if(blank($factura_inventario->factura), 404);
-        abort_unless(Storage::disk('public')->exists($factura_inventario->factura), 404);
+        $rutaFactura = ltrim((string) $factura_inventario->factura, '/');
 
-        return redirect(asset('storage/' . ltrim($factura_inventario->factura, '/')));
+        abort_unless(Storage::disk('public')->exists($rutaFactura), 404);
+
+        $rutaFisicaFactura = Storage::disk('public')->path($rutaFactura);
+        $mimeType = is_file($rutaFisicaFactura) ? (string) (mime_content_type($rutaFisicaFactura) ?: '') : '';
+        $extension = strtolower(pathinfo($rutaFactura, PATHINFO_EXTENSION));
+        $esImagen = Str::startsWith($mimeType, 'image/');
+        $esPdf = $mimeType === 'application/pdf' || $extension === 'pdf';
+
+        $factura_inventario->loadMissing([
+            'insumo:id,codigo,nombre,unidad_medida',
+            'bodega:id,nombre',
+        ]);
+
+        return view('modules.reporteria.factura_entrada_show', [
+            'entrada' => $factura_inventario,
+            'facturaUrl' => route('reporteria.facturas_entradas.archivo', $factura_inventario),
+            'facturaNombre' => basename($rutaFactura),
+            'mimeType' => $mimeType,
+            'esImagen' => $esImagen,
+            'esPdf' => $esPdf,
+        ]);
+    }
+
+    public function archivo(InsumoEntrada $factura_inventario)
+    {
+        abort_if(blank($factura_inventario->factura), 404);
+
+        $rutaFactura = ltrim((string) $factura_inventario->factura, '/');
+        abort_unless(Storage::disk('public')->exists($rutaFactura), 404);
+
+        $rutaFisicaFactura = Storage::disk('public')->path($rutaFactura);
+        abort_unless(is_file($rutaFisicaFactura), 404);
+
+        $mimeType = (string) (mime_content_type($rutaFisicaFactura) ?: 'application/octet-stream');
+
+        return response()->file($rutaFisicaFactura, [
+            'Content-Type' => $mimeType,
+            'Content-Disposition' => 'inline; filename="' . basename($rutaFactura) . '"',
+        ]);
     }
 
     public function create()

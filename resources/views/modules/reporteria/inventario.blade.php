@@ -3,7 +3,8 @@
 @section('titulo', 'Reportería de Inventario')
 
 @section('contenido')
-<main id="main" class="main">
+<main id="main" class="main reporteria-shell">
+    @include('shared.reporteria_styles')
     <style>
         .inventario-filter-card {
             border-radius: 1.25rem;
@@ -97,7 +98,7 @@
     </div>
 
     <section class="section">
-        <div class="card shadow-sm border-0 mb-4 inventario-filter-card">
+        <div class="card shadow-sm border-0 mb-4 inventario-filter-card reporteria-filter-card">
             <div class="card-body p-4">
                 <form method="GET" action="{{ route('reporteria.inventario') }}" class="row g-3 align-items-end">
                     <div class="col-12 col-md-6 col-xl-3">

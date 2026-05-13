@@ -3,7 +3,8 @@
 @section('titulo', 'Reportería de Alertas')
 
 @section('contenido')
-<main id="main" class="main">
+<main id="main" class="main reporteria-shell">
+    @include('shared.reporteria_styles')
     <div class="pagetitle">
         <h1>Alertas y Notificaciones</h1>
         <p class="text-muted mb-0">Consolida notificaciones, riesgos de stock bajo y próximos vencimientos.</p>
@@ -11,18 +12,18 @@
 
     <section class="section">
         <div class="row g-3 mb-4">
-            <div class="col-md-3"><div class="card border-0 shadow-sm h-100"><div class="card-body"><small class="text-muted text-uppercase fw-bold">No leídas</small><h3 class="mt-2 mb-0 text-danger">{{ agro_number($metricas['no_leidas']) }}</h3></div></div></div>
-            <div class="col-md-3"><div class="card border-0 shadow-sm h-100"><div class="card-body"><small class="text-muted text-uppercase fw-bold">Notificaciones</small><h3 class="mt-2 mb-0">{{ agro_number($metricas['registradas']) }}</h3></div></div></div>
-            <div class="col-md-3"><div class="card border-0 shadow-sm h-100"><div class="card-body"><small class="text-muted text-uppercase fw-bold">Stock bajo</small><h3 class="mt-2 mb-0 text-warning">{{ agro_number($metricas['stock_bajo']) }}</h3></div></div></div>
-            <div class="col-md-3"><div class="card border-0 shadow-sm h-100"><div class="card-body"><small class="text-muted text-uppercase fw-bold">Vencimientos</small><h3 class="mt-2 mb-0 text-info">{{ agro_number($metricas['vencimientos']) }}</h3></div></div></div>
+            <div class="col-md-3"><div class="card h-100 reporteria-kpi-card"><div class="card-body"><small class="reporteria-kpi-label">No leídas</small><h3 class="reporteria-kpi-value text-danger">{{ agro_number($metricas['no_leidas']) }}</h3></div></div></div>
+            <div class="col-md-3"><div class="card h-100 reporteria-kpi-card"><div class="card-body"><small class="reporteria-kpi-label">Notificaciones</small><h3 class="reporteria-kpi-value">{{ agro_number($metricas['registradas']) }}</h3></div></div></div>
+            <div class="col-md-3"><div class="card h-100 reporteria-kpi-card"><div class="card-body"><small class="reporteria-kpi-label">Stock bajo</small><h3 class="reporteria-kpi-value text-warning">{{ agro_number($metricas['stock_bajo']) }}</h3></div></div></div>
+            <div class="col-md-3"><div class="card h-100 reporteria-kpi-card"><div class="card-body"><small class="reporteria-kpi-label">Vencimientos</small><h3 class="reporteria-kpi-value text-info">{{ agro_number($metricas['vencimientos']) }}</h3></div></div></div>
         </div>
 
         <div class="row g-4">
             <div class="col-xl-6">
-                <div class="card shadow-sm border-0 h-100">
+                <div class="card shadow-sm border-0 h-100 reporteria-table-card">
                     <div class="card-header bg-white border-0 pb-0"><h5 class="card-title mb-0">Notificaciones recientes</h5></div>
                     <div class="card-body pt-3">
-                        <div class="table-responsive">
+                        <div class="table-responsive reporteria-table-responsive">
                             <table class="table table-hover table-striped table-bordered align-middle mb-0">
                                 <thead class="table-light"><tr><th>Fecha</th><th>Tipo</th><th>Mensaje</th><th>Estado</th></tr></thead>
                                 <tbody>
@@ -44,10 +45,10 @@
             </div>
 
             <div class="col-xl-6">
-                <div class="card shadow-sm border-0 mb-4">
+                <div class="card shadow-sm border-0 mb-4 reporteria-table-card">
                     <div class="card-header bg-white border-0 pb-0"><h5 class="card-title mb-0">Stock bajo</h5></div>
                     <div class="card-body pt-3">
-                        <div class="table-responsive">
+                        <div class="table-responsive reporteria-table-responsive">
                             <table class="table table-sm table-striped table-bordered align-middle mb-0">
                                 <thead class="table-light"><tr><th>Insumo</th><th>Bodega</th><th>Stock</th></tr></thead>
                                 <tbody>
@@ -62,10 +63,10 @@
                     </div>
                 </div>
 
-                <div class="card shadow-sm border-0">
+                <div class="card shadow-sm border-0 reporteria-table-card">
                     <div class="card-header bg-white border-0 pb-0"><h5 class="card-title mb-0">Vencimientos</h5></div>
                     <div class="card-body pt-3">
-                        <div class="table-responsive">
+                        <div class="table-responsive reporteria-table-responsive">
                             <table class="table table-sm table-striped table-bordered align-middle mb-0">
                                 <thead class="table-light"><tr><th>Insumo</th><th>Lote</th><th>Fecha</th></tr></thead>
                                 <tbody>

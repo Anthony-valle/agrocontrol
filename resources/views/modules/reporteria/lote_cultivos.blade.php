@@ -117,6 +117,36 @@ document.addEventListener('DOMContentLoaded', function() {
             width: '100%',
             placeholder: '-- Selecciona --',
             allowClear: true
+        }).on('change', function () {
+            if (this.value) {
+                cargarReporteLote();
+                return;
+            }
+
+            const container = document.getElementById('reporteLoteContainer');
+            const btnExcel = document.getElementById('btnLoteExcel');
+            const btnPdf = document.getElementById('btnLotePdf');
+
+            if (container) {
+                container.innerHTML = '';
+            }
+
+            [btnExcel, btnPdf].forEach((button) => {
+                if (!button) {
+                    return;
+                }
+
+                button.href = '#';
+                button.classList.add('disabled');
+                button.setAttribute('aria-disabled', 'true');
+            });
+        });
+    } else {
+        const loteSelect = document.getElementById('lote_id');
+        loteSelect?.addEventListener('change', function () {
+            if (this.value) {
+                cargarReporteLote();
+            }
         });
     }
 });

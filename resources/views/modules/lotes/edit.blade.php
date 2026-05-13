@@ -66,7 +66,7 @@
         </div>
     </div>
 
-    <div class="modal-footer border-0 pt-0 px-4 pb-4">
+    <div class="modal-footer border-0 pt-0 px-4 pb-3 lote-create-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
         <button type="submit" class="btn btn-primary">Actualizar</button>
     </div>
@@ -74,17 +74,21 @@
 
 <style>
 .lote-modal-body {
-    padding-top: 0.75rem;
+    padding-top: 0.4rem;
+    padding-inline: 1.2rem !important;
+    max-height: calc(100vh - 12.5rem);
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .lote-modal-body .row {
-    --bs-gutter-x: 1rem;
-    --bs-gutter-y: 0.45rem;
+    --bs-gutter-x: 0.85rem;
+    --bs-gutter-y: 0.35rem;
 }
 
 .lote-modal-body .form-label {
-    margin-bottom: 0.2rem !important;
-    font-size: 0.82rem;
+    margin-bottom: 0.15rem !important;
+    font-size: 0.76rem;
     color: #4f5d5a;
     letter-spacing: 0.01em;
 }
@@ -92,9 +96,9 @@
 .lote-metric-list {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.15rem 0.8rem;
+    gap: 0.08rem 0.55rem;
     align-items: center;
-    padding-top: 0.15rem;
+    padding-top: 0.08rem;
 }
 
 .lote-metric-list .map-manual-hint {
@@ -103,10 +107,10 @@
 
 #map {
     width: 100%;
-    height: clamp(280px, 42vh, 390px);
-    min-height: 280px;
-    max-height: 390px;
-    border-radius: 12px;
+    height: clamp(290px, 44vh, 420px);
+    min-height: 290px;
+    max-height: 420px;
+    border-radius: 10px;
     border: 1px solid #dbe5df;
     overflow: hidden;
 }
@@ -114,9 +118,9 @@
 .lote-modal-body .form-control,
 .lote-modal-body .form-select {
     border-color: #d7dfeb;
-    min-height: 36px;
-    padding: 0.38rem 0.75rem;
-    font-size: 0.92rem;
+    min-height: 32px;
+    padding: 0.22rem 0.55rem;
+    font-size: 0.82rem;
     border-radius: 8px;
     box-shadow: none;
     background-color: #fff;
@@ -130,43 +134,84 @@
 
 .lote-modal-body small {
     display: inline-block;
-    line-height: 1.15;
-    font-size: 0.75rem;
+    line-height: 1.05;
+    font-size: 0.67rem;
     margin-top: 0;
 }
 
 .lote-modal-body .map-unavailable-alert {
     border-radius: 10px;
-    font-size: 0.88rem;
+    font-size: 0.78rem;
 }
 
 .lote-map-section {
-    padding-top: 0.35rem;
+    padding-top: 0.2rem;
 }
 
 .lote-map-actions {
-    margin-top: 0.65rem !important;
+    margin-top: 0.5rem !important;
 }
 
 .lote-map-actions .btn {
-    min-width: 92px;
+    min-width: 0;
     border-radius: 999px;
-    padding: 0.38rem 0.8rem;
+    padding: 0.28rem 0.6rem;
+    font-size: 0.72rem;
+}
+
+.lote-modal-body .modal-footer,
+.modal-footer {
+    padding-top: 0.35rem !important;
+    padding-bottom: 0.75rem !important;
+}
+
+.lote-create-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 3;
+    background: #fff;
+    box-shadow: 0 -8px 18px rgba(15, 90, 67, 0.08);
+    padding-inline: 1.2rem !important;
+}
+
+.lote-modal-body::-webkit-scrollbar {
+    width: 9px;
+}
+
+.lote-modal-body::-webkit-scrollbar-track {
+    background: #edf2ef;
+    border-radius: 999px;
+}
+
+.lote-modal-body::-webkit-scrollbar-thumb {
+    background: #b9cbc4;
+    border-radius: 999px;
+    border: 2px solid #edf2ef;
+}
+
+.lote-modal-body::-webkit-scrollbar-thumb:hover {
+    background: #8eaba0;
+}
+
+.modal-footer .btn {
+    padding: 0.28rem 0.6rem;
+    font-size: 0.72rem;
 }
 
 @media (max-width: 600px) {
     #map {
-        height: 32vh;
-        min-height: 220px;
+        height: 34vh;
+        min-height: 240px;
     }
 
     .lote-modal-body {
-        padding-inline: 1rem;
+        padding-inline: 0.9rem;
+        max-height: calc(100vh - 10.5rem);
     }
 
     .lote-modal-body .row {
-        --bs-gutter-x: 0.75rem;
-        --bs-gutter-y: 0.65rem;
+        --bs-gutter-x: 0.65rem;
+        --bs-gutter-y: 0.55rem;
     }
 
     .lote-metric-list {

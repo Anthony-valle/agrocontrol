@@ -2,54 +2,155 @@
 
 namespace App\Exports;
 
+use App\Models\Cultivo;
 use Illuminate\Support\Collection;
-use Maatwebsite\Excel\Concerns\FromCollection;
-use Maatwebsite\Excel\Concerns\WithHeadings;
+use Maatwebsite\Excel\Concerns\FromArray;
+use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Maatwebsite\Excel\Concerns\WithDrawings;
+use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Concerns\WithTitle;
+use Maatwebsite\Excel\Events\AfterSheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
+use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class CultivoHistorialDetailsSheet implements FromCollection, WithHeadings, WithTitle
+class CultivoHistorialDetailsSheet implements FromArray, ShouldAutoSize, WithDrawings, WithEvents, WithStyles, WithTitle
 {
-    protected $cultivo;
+    protected Cultivo $cultivo;
 
-    public function __construct($cultivo)
+    protected Collection $consumos;
+
+    public function __construct(Cultivo $cultivo, Collection $consumos)
     {
         $this->cultivo = $cultivo;
+        $this->consumos = $consumos;
     }
 
-    public function collection(): Collection
+    public function array(): array
     {
-        return $this->cultivo->consumos->sortByDesc('fecha_consumo')->flatMap(function ($consumo) {
+        $rows = $this->consumos->sortByDesc('fecha_consumo')->flatMap(function ($consumo) {
             return $consumo->detalles->map(function ($detalle) use ($consumo) {
+                $insumo = $detalle->insumo;
+
                 return [
-                    'consumo_id' => $consumo->id,
-                    'fecha_consumo' => $consumo->fecha_consumo,
-                    'semana' => \Carbon\Carbon::parse($consumo->fecha_consumo)->weekOfYear,
-                    'categoria' => $detalle->categoria,
-                    'descripcion' => $detalle->descripcion,
-                    'cantidad' => $detalle->cantidad,
-                    'unidad_medida' => $detalle->unidad_medida,
-                    'subtotal' => $detalle->subtotal,
+                    $consumo->fecha_consumo ? \Carbon\Carbon::parse($consumo->fecha_consumo)->format('d/m/Y') : '-',
+                    optional($this->cultivo->lote)->nombre ?? '-',
+                    $this->cultivo->nombre,
+                    $insumo->codigo ?? '-',
+                    $insumo->nombre ?? ($detalle->descripcion ?: '-'),
+                    $detalle->lote ?: '-',
+                    $insumo->ingrediente_activo ?? $insumo->ingredientes_activo ?? '-',
+                    (float) ($detalle->cantidad ?? 0),
+                    $detalle->unidad_medida ?? $insumo->unidad_medida ?? '-',
+                    (float) ($detalle->subtotal ?? 0),
                 ];
             });
-        })->values();
-    }
+        })->values()->all();
 
-    public function headings(): array
-    {
-        return [
-            'Consumo ID',
-            'Fecha Consumo',
-            'Semana',
-            'Categoría',
-            'Descripción',
-            'Cantidad',
-            'Unidad de Medida',
-            'Subtotal',
-        ];
+        return array_merge([
+            ['Reporte de Consumos - ' . $this->cultivo->nombre],
+            ['Generado', now()->format('d/m/Y H:i')],
+            ['Fecha', 'Lote', 'Cultivo', 'Codigo', 'Insumo / Concepto', 'Lote consumido', 'Ingrediente activo', 'Cantidad', 'Unidad', 'Subtotal'],
+        ], $rows, [[
+            '', '', '', '', '', '', '', '', 'TOTAL', (float) $this->consumos->flatMap(fn ($consumo) => $consumo->detalles)->sum('subtotal'),
+        ]]);
     }
 
     public function title(): string
     {
         return 'Detalle';
+    }
+
+    public function drawings(): array
+    {
+        $logoPath = public_path('NiceAdmin/assets/img/agrocontrol.png');
+
+        if (! file_exists($logoPath)) {
+            return [];
+        }
+
+        $drawing = new Drawing();
+        $drawing->setName('Logo AgroControl');
+        $drawing->setDescription('Logo AgroControl');
+        $drawing->setPath($logoPath);
+        $drawing->setHeight(54);
+        $drawing->setCoordinates('A1');
+        $drawing->setOffsetX(8);
+        $drawing->setOffsetY(6);
+
+        return [$drawing];
+    }
+
+    public function styles(Worksheet $sheet): array
+    {
+        $totalRow = 4 + $this->consumos->flatMap(fn ($consumo) => $consumo->detalles)->count();
+
+        return [
+            1 => [
+                'font' => ['bold' => true, 'size' => 16, 'color' => ['rgb' => '16624F']],
+            ],
+            2 => [
+                'font' => ['bold' => true, 'color' => ['rgb' => '5B6470']],
+            ],
+            3 => [
+                'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => '16624F'],
+                ],
+            ],
+            $totalRow => [
+                'font' => ['bold' => true],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'FFF4D6'],
+                ],
+            ],
+        ];
+    }
+
+    public function registerEvents(): array
+    {
+        return [
+            AfterSheet::class => function (AfterSheet $event) {
+                $sheet = $event->sheet->getDelegate();
+                $totalRow = 4 + $this->consumos->flatMap(fn ($consumo) => $consumo->detalles)->count();
+
+                $sheet->mergeCells('B1:J1');
+                $sheet->mergeCells('B2:J2');
+                $sheet->setCellValue('A1', '');
+                $sheet->setCellValue('A2', '');
+                $sheet->setCellValue('B1', 'Reporte de Consumos - ' . $this->cultivo->nombre);
+                $sheet->setCellValue('B2', 'Generado: ' . now()->format('d/m/Y H:i'));
+                $sheet->freezePane('A4');
+
+                $sheet->getRowDimension(1)->setRowHeight(48);
+                $sheet->getRowDimension(2)->setRowHeight(24);
+
+                $sheet->getStyle("A3:J{$totalRow}")->applyFromArray([
+                    'borders' => [
+                        'allBorders' => [
+                            'borderStyle' => Border::BORDER_THIN,
+                            'color' => ['rgb' => 'D9E2EC'],
+                        ],
+                    ],
+                    'alignment' => [
+                        'vertical' => Alignment::VERTICAL_CENTER,
+                    ],
+                ]);
+
+                $sheet->getStyle('H4:H' . $totalRow)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER_00);
+                $sheet->getStyle('J4:J' . $totalRow)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER_00);
+                $sheet->getStyle('H4:H' . $totalRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                $sheet->getStyle('J4:J' . $totalRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                $sheet->getStyle('A1:J2')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+                $sheet->getStyle('B1:J1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+                $sheet->getStyle('B2:J2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+            },
+        ];
     }
 }

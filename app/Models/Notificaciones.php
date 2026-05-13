@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use App\Jobs\RegistrarNotificacionesSupervision;
 use App\Traits\EmpresaScope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -32,15 +32,17 @@ class Notificaciones extends Model
         return $this->belongsTo(User::class, 'user_id');
     }
 
-    public function scopeNoLeidas($query)
+    public function scopeNoLeidas(Builder $query): Builder
     {
         return $query->where('leido', false);
     }
 
     public static function registrarParaSupervision(array $payload): void
     {
-        if (config('queue.default') !== 'sync') {
-            RegistrarNotificacionesSupervision::dispatch($payload)->afterCommit();
+        if (DB::transactionLevel() > 0) {
+            DB::afterCommit(function () use ($payload): void {
+                static::persistirParaSupervision($payload);
+            });
 
             return;
         }

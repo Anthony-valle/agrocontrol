@@ -208,10 +208,10 @@ Route::middleware(['auth', AuditUserAction::class])->group(function () {
     
     Route::get('reporte/cultivo/{id}', [ReporteController::class, 'reporteFinal'])->name('reporte.cultivo.final');
     Route::get('reporte/cultivo/{id}/categoria-detalle', [ReporteController::class, 'categoriaDetalle'])->name('reporte.cultivo.categoria-detalle');
-    Route::get('reporte/cultivo/{id}/historial', [ReporteController::class, 'historialConsumo'])->name('reporte.cultivo.historial');
+    Route::get('reporte/cultivo/{cultivo_id}/historial', [ReporteController::class, 'historialConsumo'])->name('reporte.cultivo.historial');
     Route::get('reporte/cultivo/{cultivo_id}/historial/consumo/{consumo_id}', [ReporteController::class, 'historialConsumoDetalle'])->name('reporte.cultivo.historial.detalle');
-    Route::get('reporte/cultivo/{id}/historial/excel', [ReporteController::class, 'historialConsumoExcel'])->name('reporte.cultivo.historial.excel');
-    Route::get('reporte/cultivo/{id}/historial/pdf', [ReporteController::class, 'historialConsumoPdf'])->name('reporte.cultivo.historial.pdf');
+    Route::get('reporte/cultivo/{cultivo_id}/historial/excel', [ReporteController::class, 'historialConsumoExcel'])->name('reporte.cultivo.historial.excel');
+    Route::get('reporte/cultivo/{cultivo_id}/historial/pdf', [ReporteController::class, 'historialConsumoPdf'])->name('reporte.cultivo.historial.pdf');
     // INVENTARIOS
     Route::resource('inventarios', InventarioController::class)->only(['index']);
     Route::get('inventarios/{id}/detalle', [InventarioController::class, 'detalle'])->name('inventarios.detalle');
@@ -254,6 +254,7 @@ Route::middleware(['auth', AuditUserAction::class])->group(function () {
     Route::get('/reporteria/inventario/pdf', [\App\Http\Controllers\Reporteria\InventarioReportController::class, 'exportPdf'])->name('reporteria.inventario.pdf');
     Route::get('/reporteria/facturas-entradas', [FacturaInventarioController::class, 'index'])->name('reporteria.facturas_entradas');
     Route::get('/reporteria/facturas-entradas/{factura_inventario}', [FacturaInventarioController::class, 'show'])->name('reporteria.facturas_entradas.show');
+    Route::get('/reporteria/facturas-entradas/{factura_inventario}/archivo', [FacturaInventarioController::class, 'archivo'])->name('reporteria.facturas_entradas.archivo');
     // Reporterías de cosechas
     Route::get('/reporteria/cosechas', [\App\Http\Controllers\Reporteria\CosechasReportController::class, 'index'])->name('reporteria.cosechas');
     Route::get('/reporteria/cosechas/excel', [\App\Http\Controllers\Reporteria\CosechasReportController::class, 'exportExcel'])->name('reporteria.cosechas.excel');

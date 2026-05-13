@@ -70,7 +70,9 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Cultivo::class, CultivoPolicy::class);
         Gate::policy(Lote::class, LotePolicy::class);
 
-        view()->share('notificacionesCampana', $this->loadBellNotifications());
+        view()->composer('shared.header', function ($view) {
+            $view->with('notificacionesCampana', $this->loadBellNotifications());
+        });
     }
 
     private function loadBellNotifications(): Collection

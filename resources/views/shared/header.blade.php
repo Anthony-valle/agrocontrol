@@ -1,3 +1,60 @@
+<style>
+  .notifications-dropdown-menu {
+    width: min(380px, 92vw);
+  }
+
+  .notifications-scroll {
+    max-height: 420px;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .notifications-scroll::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .notifications-scroll::-webkit-scrollbar-thumb {
+    background: rgba(16, 94, 74, 0.28);
+    border-radius: 999px;
+  }
+
+  .notifications-scroll::-webkit-scrollbar-track {
+    background: rgba(16, 94, 74, 0.08);
+  }
+
+  .notifications-scroll .notification-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 18px;
+    white-space: normal;
+  }
+
+  .notifications-scroll .notification-item i {
+    font-size: 1.4rem;
+    line-height: 1;
+    margin-top: 4px;
+  }
+
+  .notifications-scroll .notification-item h4 {
+    margin-bottom: 4px;
+  }
+
+  .notifications-scroll .notification-item p {
+    margin-bottom: 4px;
+  }
+
+  .notifications-scroll .dropdown-divider {
+    margin: 0;
+  }
+  
+  @media (max-width: 576px) {
+    .notifications-scroll {
+      max-height: 320px;
+    }
+  }
+</style>
+
 <header id="header" class="header fixed-top d-flex align-items-center" style="background-color: #dbf5e1;">
 
   <!-- LOGO y toggle sidebar -->
@@ -31,45 +88,49 @@
           @endif
         </a>
 
-        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow notifications">
+        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow notifications notifications-dropdown-menu">
           <li class="dropdown-header" id="notiHeaderText">
             Tienes {{ $notificacionesCampana->count() ?? 0 }} notificaciones
           </li>
 
           <li><hr class="dropdown-divider"></li>
 
-          @forelse($notificacionesCampana as $n)
-            @php
-                $tipo = strtolower((string) $n->tipo);
-                $iconClass = match ($tipo) {
-                    'consumo' => 'bi bi-droplet-half text-success',
-                    'cosecha' => 'bi bi-basket2 text-info',
-                    'mecanizacion' => 'bi bi-truck text-warning',
-                    'auditoria' => 'bi bi-shield-check text-secondary',
-                    default => 'bi bi-box-seam text-primary',
-                };
-                $titulo = match ($tipo) {
-                    'consumo' => 'Consumo',
-                    'cosecha' => 'Cosecha',
-                    'mecanizacion' => 'Mecanización',
-                    'auditoria' => 'Auditoría',
-                    default => ucfirst((string) ($n->tipo ?? 'Notificación')),
-                };
-            @endphp
-            <li class="notification-item {{ !$n->leido ? 'noti-noleida' : '' }}" data-created-at="{{ optional($n->created_at)->toIso8601String() }}">
-              <i class="{{ $iconClass }}"></i>
-              <div>
-                <h4>{{ $n->titulo ?? $titulo }}</h4>
-                <p>{{ $n->mensaje }}</p>
-                <p>{{ $n->created_at->diffForHumans() }}</p>
-              </div>
-            </li>
-            <li><hr class="dropdown-divider"></li>
-          @empty
-            <li class="text-center p-3">
-              Sin notificaciones
-            </li>
-          @endforelse
+          <li class="p-0">
+            <div class="notifications-scroll">
+              @forelse($notificacionesCampana as $n)
+                @php
+                    $tipo = strtolower((string) $n->tipo);
+                    $iconClass = match ($tipo) {
+                        'consumo' => 'bi bi-droplet-half text-success',
+                        'cosecha' => 'bi bi-basket2 text-info',
+                        'mecanizacion' => 'bi bi-truck text-warning',
+                        'auditoria' => 'bi bi-shield-check text-secondary',
+                        default => 'bi bi-box-seam text-primary',
+                    };
+                    $titulo = match ($tipo) {
+                        'consumo' => 'Consumo',
+                        'cosecha' => 'Cosecha',
+                        'mecanizacion' => 'Mecanización',
+                        'auditoria' => 'Auditoría',
+                        default => ucfirst((string) ($n->tipo ?? 'Notificación')),
+                    };
+                @endphp
+                <div class="notification-item {{ !$n->leido ? 'noti-noleida' : '' }}" data-created-at="{{ optional($n->created_at)->toIso8601String() }}">
+                  <i class="{{ $iconClass }}"></i>
+                  <div>
+                    <h4>{{ $n->titulo ?? $titulo }}</h4>
+                    <p>{{ $n->mensaje }}</p>
+                    <p>{{ $n->created_at->diffForHumans() }}</p>
+                  </div>
+                </div>
+                <hr class="dropdown-divider">
+              @empty
+                <div class="text-center p-3">
+                  Sin notificaciones
+                </div>
+              @endforelse
+            </div>
+          </li>
 
           <li class="dropdown-footer">
             <a href="{{ route('notificaciones.index') }}">Ver todas</a>

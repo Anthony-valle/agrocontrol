@@ -309,16 +309,7 @@ class ReporteController extends Controller
             $perPage = 15;
         }
 
-        $consumosBaseQuery = $cultivo->consumos()
-            ->orderByDesc('fecha_consumo');
-
-        if ($fechaDesde !== '') {
-            $consumosBaseQuery->whereDate('fecha_consumo', '>=', $fechaDesde);
-        }
-
-        if ($fechaHasta !== '') {
-            $consumosBaseQuery->whereDate('fecha_consumo', '<=', $fechaHasta);
-        }
+        $consumosBaseQuery = $this->buildHistorialConsumoQuery($cultivo, $fechaDesde, $fechaHasta);
 
         $consumosFiltrados = (clone $consumosBaseQuery)
             ->with('detalles.insumo')
@@ -401,23 +392,33 @@ class ReporteController extends Controller
         ]);
     }
 
-    public function historialConsumoExcel(int $cultivo_id)
+    public function historialConsumoExcel(Request $request, int $cultivo_id)
     {
         $cultivo = Cultivo::with(['consumos.detalles.insumo'])
             ->findOrFail($cultivo_id);
 
+        $fechaDesde = trim((string) $request->query('fecha_desde', ''));
+        $fechaHasta = trim((string) $request->query('fecha_hasta', ''));
+        $consumos = $this->buildHistorialConsumoQuery($cultivo, $fechaDesde, $fechaHasta)
+            ->with('detalles.insumo')
+            ->get();
+
         return Excel::download(
-            new CultivoHistorialExport($cultivo),
-            "historial_cultivo_{$cultivo->id}.xlsx"
+            new CultivoHistorialExport($cultivo, $consumos),
+            'historial_cultivo_' . $cultivo->id . '_' . now()->format('Ymd_His') . '.xlsx'
         );
     }
 
-    public function historialConsumoPdf(int $cultivo_id)
+    public function historialConsumoPdf(Request $request, int $cultivo_id)
     {
         $cultivo = Cultivo::with(['consumos.detalles.insumo'])
             ->findOrFail($cultivo_id);
 
-        $consumos = $cultivo->consumos->sortByDesc('fecha_consumo');
+        $fechaDesde = trim((string) $request->query('fecha_desde', ''));
+        $fechaHasta = trim((string) $request->query('fecha_hasta', ''));
+        $consumos = $this->buildHistorialConsumoQuery($cultivo, $fechaDesde, $fechaHasta)
+            ->with('detalles.insumo')
+            ->get();
 
         $consumoDetalles = $consumos->flatMap(function ($consumo) {
             return $consumo->detalles->map(function ($detalle) use ($consumo) {
@@ -453,7 +454,15 @@ class ReporteController extends Controller
             'totalConsumos'
         ));
 
-        return $pdf->download("historial_cultivo_{$cultivo->id}.pdf");
+        return $pdf->download('historial_cultivo_' . $cultivo->id . '_' . now()->format('Ymd_His') . '.pdf');
+    }
+
+    private function buildHistorialConsumoQuery(Cultivo $cultivo, string $fechaDesde = '', string $fechaHasta = '')
+    {
+        return $cultivo->consumos()
+            ->when($fechaDesde !== '', fn ($query) => $query->whereDate('fecha_consumo', '>=', $fechaDesde))
+            ->when($fechaHasta !== '', fn ($query) => $query->whereDate('fecha_consumo', '<=', $fechaHasta))
+            ->orderByDesc('fecha_consumo');
     }
 
     private function cosechaFacturasDisponible(): bool

@@ -5,6 +5,16 @@
 @section('contenido')
 <main id="main" class="main">
     <style>
+        .facturas-shell {
+            border-radius: 1.25rem;
+            overflow: hidden;
+        }
+
+        .facturas-header {
+            padding: 1.1rem 1.35rem;
+            border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+        }
+
         .facturas-kpi {
             border: 0;
             border-radius: 1rem;
@@ -34,13 +44,6 @@
             min-width: 1120px;
         }
 
-        .factura-path {
-            max-width: 220px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
         .facturas-total {
             white-space: nowrap;
         }
@@ -50,16 +53,135 @@
             font-weight: 600;
         }
 
+        .facturas-anexo-cell {
+            min-width: 130px;
+            text-align: center;
+        }
+
+        .facturas-anexo-cell .btn {
+            white-space: nowrap;
+        }
+
+        .facturas-filtros {
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 1rem;
+            background: linear-gradient(180deg, #f8fbff 0%, #f4f7fb 100%);
+            padding: 1rem;
+        }
+
+        .facturas-filtros-grid {
+            display: grid;
+            grid-template-columns: minmax(110px, 130px) minmax(260px, 1.35fr) repeat(4, minmax(150px, 1fr));
+            gap: 0.85rem;
+            align-items: end;
+        }
+
+        .facturas-filtros-grid > div {
+            min-width: 0;
+        }
+
+        .facturas-filtro-buscar {
+            grid-column: span 1;
+        }
+
+        .facturas-filtros-label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #64748b;
+            margin-bottom: 0.35rem;
+        }
+
+        .facturas-filtros .form-select,
+        .facturas-filtros .form-control,
+        .facturas-filtros .input-group-text {
+            border-radius: 0.75rem;
+        }
+
+        .facturas-filtros .input-group-text {
+            border-right: 0;
+        }
+
+        .facturas-filtros .input-group .form-control {
+            border-left: 0;
+        }
+
+        .facturas-filtros-acciones {
+            display: flex;
+            gap: 0.65rem;
+            align-items: end;
+            justify-content: flex-end;
+            grid-column: 1 / -1;
+        }
+
+        .facturas-btn-icon {
+            min-width: 42px;
+            min-height: 42px;
+            border-radius: 0.8rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .facturas-tabla-wrap {
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 1rem;
+            overflow: hidden;
+            background: #fff;
+        }
+
         @media (max-width: 767.98px) {
             .facturas-kpi .card-body {
                 padding: 1rem;
             }
         }
+
+        @media (max-width: 1399.98px) {
+            .facturas-filtros-grid {
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+            }
+
+            .facturas-filtros-acciones {
+                justify-content: flex-start;
+            }
+        }
+
+        @media (max-width: 991.98px) {
+            .facturas-filtros-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .facturas-filtros-acciones {
+                grid-column: 1 / -1;
+            }
+        }
+
+        @media (max-width: 575.98px) {
+            .facturas-header {
+                padding: 1rem;
+            }
+
+            .facturas-filtros-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .facturas-filtros-acciones {
+                grid-column: auto;
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .facturas-filtros-acciones .btn {
+                width: 100%;
+            }
+        }
     </style>
 
     <section class="section">
-        <div class="card shadow-sm border-0">
-            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <div class="card shadow-sm border-0 facturas-shell">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center facturas-header">
                 <h5 class="card-title mb-0 fw-bold">
                     <i class="fa-solid fa-paperclip me-2 text-primary"></i>
                     Facturas de Entradas
@@ -107,59 +229,75 @@
                         La tabla de entradas legacy no está disponible en esta base, por lo que no se pueden consultar anexos todavía.
                     </div>
                 @else
-                    <form method="GET" action="{{ route('reporteria.facturas_entradas') }}" class="d-flex flex-wrap justify-content-between align-items-center mb-3 p-2 bg-light rounded shadow-sm gap-3">
-                        <div class="d-flex align-items-center gap-3 flex-wrap">
-                            <div class="d-flex align-items-center gap-2">
-                                <select id="customPerPage" name="per_page" class="form-select form-select-sm" style="width:auto;">
+                    <form method="GET" action="{{ route('reporteria.facturas_entradas') }}" class="facturas-filtros mb-4">
+                        <div class="facturas-filtros-grid">
+                            <div>
+                                <label for="customPerPage" class="facturas-filtros-label">Registros</label>
+                                <select id="customPerPage" name="per_page" class="form-select form-select-sm">
                                     @foreach([10, 15, 20, 50, 100] as $size)
                                         <option value="{{ $size }}" {{ (int) request('per_page', 15) === $size ? 'selected' : '' }}>{{ $size }}</option>
                                     @endforeach
                                 </select>
-                                <small class="text-muted">registros</small>
                             </div>
 
-                            <div class="input-group input-group-sm" style="max-width: 320px;">
-                                <span class="input-group-text bg-white">
-                                    <i class="fa-solid fa-magnifying-glass text-muted"></i>
-                                </span>
-                                <input
-                                    type="text"
-                                    name="q"
-                                    class="form-control"
-                                    placeholder="Buscar producto, código, proveedor o archivo..."
-                                    value="{{ request('q') }}"
-                                >
+                            <div class="facturas-filtro-buscar">
+                                <label for="facturasSearch" class="facturas-filtros-label">Buscar</label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text bg-white">
+                                        <i class="fa-solid fa-magnifying-glass text-muted"></i>
+                                    </span>
+                                    <input
+                                        id="facturasSearch"
+                                        type="text"
+                                        name="q"
+                                        class="form-control"
+                                        placeholder="Buscar producto, código, proveedor o archivo..."
+                                        value="{{ request('q') }}"
+                                    >
+                                </div>
                             </div>
 
-                            <select id="filtroBodega" name="bodega_id" class="form-select form-select-sm">
-                                <option value="">Todas las bodegas</option>
-                                @foreach($bodegas as $bodega)
-                                    <option value="{{ $bodega->id }}" {{ (string) request('bodega_id') === (string) $bodega->id ? 'selected' : '' }}>{{ $bodega->nombre }}</option>
-                                @endforeach
-                            </select>
+                            <div>
+                                <label for="filtroBodega" class="facturas-filtros-label">Bodega</label>
+                                <select id="filtroBodega" name="bodega_id" class="form-select form-select-sm">
+                                    <option value="">Todas las bodegas</option>
+                                    @foreach($bodegas as $bodega)
+                                        <option value="{{ $bodega->id }}" {{ (string) request('bodega_id') === (string) $bodega->id ? 'selected' : '' }}>{{ $bodega->nombre }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
 
-                            <select id="filtroAnexo" name="anexo" class="form-select form-select-sm">
-                                <option value="">Todos los anexos</option>
-                                <option value="con" {{ request('anexo') === 'con' ? 'selected' : '' }}>Con anexo</option>
-                                <option value="sin" {{ request('anexo') === 'sin' ? 'selected' : '' }}>Sin anexo</option>
-                            </select>
+                            <div>
+                                <label for="filtroAnexo" class="facturas-filtros-label">Anexo</label>
+                                <select id="filtroAnexo" name="anexo" class="form-select form-select-sm">
+                                    <option value="">Todos los anexos</option>
+                                    <option value="con" {{ request('anexo') === 'con' ? 'selected' : '' }}>Con anexo</option>
+                                    <option value="sin" {{ request('anexo') === 'sin' ? 'selected' : '' }}>Sin anexo</option>
+                                </select>
+                            </div>
 
-                            <input type="date" name="fecha_desde" class="form-control form-control-sm" value="{{ request('fecha_desde') }}">
-                            <input type="date" name="fecha_hasta" class="form-control form-control-sm" value="{{ request('fecha_hasta') }}">
+                            <div>
+                                <label for="fechaDesde" class="facturas-filtros-label">Fecha desde</label>
+                                <input id="fechaDesde" type="date" name="fecha_desde" class="form-control form-control-sm" value="{{ request('fecha_desde') }}">
+                            </div>
 
-                            <button type="submit" class="btn btn-primary btn-sm">
-                                <i class="fa-solid fa-filter me-1"></i>
-                            </button>
-                        </div>
+                            <div>
+                                <label for="fechaHasta" class="facturas-filtros-label">Fecha hasta</label>
+                                <input id="fechaHasta" type="date" name="fecha_hasta" class="form-control form-control-sm" value="{{ request('fecha_hasta') }}">
+                            </div>
 
-                        <div class="d-flex align-items-center gap-2">
-                            <a href="{{ route('reporteria.facturas_entradas') }}" class="btn btn-outline-secondary btn-sm">
-                                <i class="bi bi-arrow-clockwise me-1"></i>Limpiar
-                            </a>
+                            <div class="facturas-filtros-acciones">
+                                <button type="submit" class="btn btn-primary btn-sm facturas-btn-icon" title="Filtrar">
+                                    <i class="fa-solid fa-filter"></i>
+                                </button>
+                                <a href="{{ route('reporteria.facturas_entradas') }}" class="btn btn-outline-secondary btn-sm">
+                                    <i class="bi bi-arrow-clockwise me-1"></i>Limpiar
+                                </a>
+                            </div>
                         </div>
                     </form>
 
-                    <div class="table-responsive border rounded facturas-table">
+                    <div class="table-responsive facturas-table facturas-tabla-wrap">
                         <table class="table table-hover w-100 mb-0">
                             <thead class="table-light">
                                 <tr>
@@ -191,12 +329,11 @@
                                         </td>
                                         <td>L {{ agro_number((float) $entrada->costo_unitario, 2) }}</td>
                                         <td class="fw-bold facturas-total">L {{ agro_number(((float) ($entrada->cantidad ?? $entrada->cantida ?? 0)) * (float) $entrada->costo_unitario, 2) }}</td>
-                                        <td>
+                                        <td class="facturas-anexo-cell">
                                             @if(! blank($entrada->factura))
-                                                <div class="d-flex align-items-center gap-2">
-                                                    <a href="{{ route('reporteria.facturas_entradas.show', $entrada) }}" class="btn btn-outline-primary btn-sm" target="_blank">Abrir</a>
-                                                    <small class="text-muted factura-path" title="{{ $entrada->factura }}">{{ $entrada->factura }}</small>
-                                                </div>
+                                                <a href="{{ route('reporteria.facturas_entradas.show', $entrada) }}" class="btn btn-outline-primary btn-sm">
+                                                    <i class="fa-regular fa-file-lines me-1"></i>Ver anexo
+                                                </a>
                                             @else
                                                 <span class="badge bg-secondary">Sin anexo</span>
                                             @endif
@@ -211,46 +348,7 @@
                         </table>
                     </div>
 
-                    <div class="d-flex flex-wrap justify-content-between align-items-center mt-3 gap-2">
-                        <small class="text-muted">
-                            @if($entradas->total() > 0)
-                                Mostrando {{ $entradas->firstItem() }}-{{ $entradas->lastItem() }} de {{ $entradas->total() }} registros | Hoja {{ $entradas->currentPage() }} de {{ $entradas->lastPage() }}
-                            @else
-                                No hay registros para mostrar.
-                            @endif
-                        </small>
-
-                        @if($entradas->lastPage() > 1)
-                            @php
-                                $maxPaginasVisibles = 6;
-                                $paginaActual = $entradas->currentPage();
-                                $ultimaPagina = $entradas->lastPage();
-                                $inicioPagina = max(1, $paginaActual - intdiv($maxPaginasVisibles - 1, 2));
-                                $finPagina = min($ultimaPagina, $inicioPagina + $maxPaginasVisibles - 1);
-
-                                if (($finPagina - $inicioPagina + 1) < $maxPaginasVisibles) {
-                                    $inicioPagina = max(1, $finPagina - $maxPaginasVisibles + 1);
-                                }
-                            @endphp
-                            <nav aria-label="Paginacion de facturas de entradas">
-                                <ul class="pagination pagination-sm mb-0">
-                                    <li class="page-item {{ $entradas->onFirstPage() ? 'disabled' : '' }}">
-                                        <a class="page-link" href="{{ $entradas->onFirstPage() ? '#' : $entradas->previousPageUrl() }}">Anterior</a>
-                                    </li>
-
-                                    @for($page = $inicioPagina; $page <= $finPagina; $page++)
-                                        <li class="page-item {{ $page === $entradas->currentPage() ? 'active' : '' }}">
-                                            <a class="page-link" href="{{ $entradas->url($page) }}">{{ $page }}</a>
-                                        </li>
-                                    @endfor
-
-                                    <li class="page-item {{ $entradas->hasMorePages() ? '' : 'disabled' }}">
-                                        <a class="page-link" href="{{ $entradas->hasMorePages() ? $entradas->nextPageUrl() : '#' }}">Siguiente</a>
-                                    </li>
-                                </ul>
-                            </nav>
-                        @endif
-                    </div>
+                    @include('shared.table_pagination_footer', ['paginator' => $entradas, 'ariaLabel' => 'Paginacion de facturas de entradas'])
                 @endif
             </div>
         </div>

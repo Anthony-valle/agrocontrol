@@ -71,6 +71,51 @@
     #main.main .table-hover tbody tr:hover {
       background: #f5fbf8;
     }
+
+    #main.main .table-responsive {
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(15, 90, 67, 0.45) rgba(15, 90, 67, 0.08);
+    }
+
+    #main.main .table-responsive::-webkit-scrollbar {
+      height: 11px;
+    }
+
+    #main.main .table-responsive::-webkit-scrollbar-track {
+      background: rgba(15, 90, 67, 0.08);
+      border-radius: 999px;
+    }
+
+    #main.main .table-responsive::-webkit-scrollbar-thumb {
+      background: rgba(15, 90, 67, 0.45);
+      border-radius: 999px;
+    }
+
+    #main.main .table-responsive::-webkit-scrollbar-thumb:hover {
+      background: rgba(15, 90, 67, 0.62);
+    }
+
+    #main.main .tabla-paginada-footer {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+
+    #main.main .tabla-paginada-footer-info {
+      color: #6c757d;
+      font-size: 0.92rem;
+    }
+
+    @media (max-width: 767.98px) {
+      #main.main .tabla-paginada-footer {
+        align-items: stretch;
+      }
+    }
   </style>
 </head>
   
@@ -169,8 +214,6 @@
       });
     }
   </script>
-
-
   <!-- SweetAlert2 -->
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script>
