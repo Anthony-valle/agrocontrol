@@ -73,7 +73,7 @@
                         <th>Tipo</th>
                         <th>Cantidad</th>
                         <th>Origen</th>
-                        <th>Destino (Cultivo)</th>
+                        <th>Destino</th>
                         <th>Lote</th>
                         <th>Stock</th>
                         <th>Fecha</th>
@@ -82,7 +82,7 @@
                 <tbody>
                     @forelse($movimientos as $mov)
                     <tr>
-                        <td>{{ $loop->iteration }}</td>
+                        <td>{{ ($movimientos->firstItem() ?? 0) + $loop->index }}</td>
                         <td>{{ $mov->insumo->codigo ?? '-' }}</td>
                         <td>{{ $mov->insumo->nombre ?? '-' }}</td>
                         <td>
@@ -132,16 +132,19 @@
                         </td>
                         <td>{{ $mov->bodegaOrigen->nombre ?? '-' }}</td>
                         
-                        {{-- COLUMNA DESTINO CON LÓGICA DE CULTIVO --}}
                         <td class="text-center">
-                            @if($tipo === 'CONSUMO' && $mov->consumo)
+                            @php
+                                $cultivoDestino = $mov->consumo?->cultivo ?? ($tipo === 'CONSUMO' ? ($consumoDestinoFallback ?? null) : null);
+                            @endphp
+
+                            @if($tipo === 'CONSUMO' && $cultivoDestino)
                                 <div class="d-flex flex-column align-items-center">
                                     <span class="badge bg-primary shadow-sm" style="font-size: 0.85rem; padding: 5px 10px;">
                                         <i class="fa-solid fa-seedling me-1"></i>
-                                        {{ $mov->consumo->cultivo->nombre ?? 'Sin Cultivo' }}
+                                        Cultivo: {{ $cultivoDestino->nombre ?? 'Sin Cultivo' }}
                                     </span>
                                     <small class="text-muted mt-1" style="font-size: 0.7rem;">
-                                        {{ $mov->consumo->cultivo->lote->nombre ?? '' }}
+                                        {{ $cultivoDestino->lote->nombre ?? 'Sin lote' }}
                                     </small>
                                 </div>
                             @elseif($tipo === 'ENTRADA' || $tipo === 'TRASLADO')
@@ -166,6 +169,12 @@
             </table>
         </div>
 
+        @if($movimientos->count() > 0)
+            <div class="mt-3">
+                @include('shared.table_pagination_footer', ['paginator' => $movimientos, 'ariaLabel' => 'Paginacion de historial de movimientos'])
+            </div>
+        @endif
+
     </div>
 </div>
 
@@ -178,11 +187,8 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-    const tabla = document.getElementById("tablaMovimientos");
-    const filas = Array.from(tabla.tBodies[0].rows);
-    const inputBusqueda = document.getElementById("busqueda");
+    const form = document.querySelector('form[action="{{ route('movimientos.index') }}"]');
     const perPageSelect = document.getElementById("perPage");
-    const tipoSelect = document.querySelector('select[name="tipo"]');
 
     function initSelectBuscable(selector, placeholder) {
         if (!window.jQuery || !jQuery.fn || !jQuery.fn.select2) return;
@@ -203,29 +209,11 @@ document.addEventListener("DOMContentLoaded", () => {
     initSelectBuscable('#perPage', 'Registros...');
     initSelectBuscable('select[name="tipo"]', 'Tipo...');
 
-    function mostrarFilas(filasVisibles){
-        filas.forEach(f => f.style.display = "none");
-        filasVisibles.forEach(f => f.style.display = "");
+    if (form && perPageSelect) {
+        perPageSelect.addEventListener("change", function () {
+            form.submit();
+        });
     }
-
-    function filtrarTabla(){
-        const texto = inputBusqueda.value.toLowerCase();
-        const filtradas = filas.filter(f =>
-            Array.from(f.cells).some(c =>
-                c.textContent.toLowerCase().includes(texto)
-            )
-        );
-        mostrarFilas(filtradas.slice(0, parseInt(perPageSelect.value)));
-    }
-
-    inputBusqueda.addEventListener("input", filtrarTabla);
-    perPageSelect.addEventListener("change", filtrarTabla);
-    if (tipoSelect) {
-        tipoSelect.addEventListener("change", filtrarTabla);
-    }
-
-    // Inicializar vista
-    filtrarTabla();
 });
 </script>
 @endsection

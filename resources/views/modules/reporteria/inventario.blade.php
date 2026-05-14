@@ -214,9 +214,8 @@
                             <div class="d-flex align-items-center gap-3 flex-wrap">
                                 <div class="d-flex align-items-center gap-2">
                                     <select id="customPerPage" class="form-select form-select-sm" style="width: auto;">
-                                        <option value="25" {{ $perPage === 25 ? 'selected' : '' }}>25</option>
-                                        <option value="50" {{ $perPage === 50 ? 'selected' : '' }}>50</option>
-                                        <option value="100" {{ $perPage === 100 ? 'selected' : '' }}>100</option>
+                                        <option value="10" {{ $perPage === 10 ? 'selected' : '' }}>10</option>
+                                        <option value="15" {{ $perPage === 15 ? 'selected' : '' }}>15</option>
                                     </select>
                                     <small class="text-muted text-nowrap">registros</small>
                                 </div>

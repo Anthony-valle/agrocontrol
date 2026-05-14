@@ -50,7 +50,8 @@
                     @forelse($insumos as $insumo)
                         @php
                             $stockTotal = $insumo->inventarioBodegas->sum('stock_actual');
-                            $valorTotal = $insumo->inventarioBodegas->sum(fn ($lote) => $lote->stock_actual * $lote->costo_promedio);
+                            $stockMinimo = (float) ($insumo->stock_minimo_resuelto ?? 0);
+                            $valorTotal = (float) ($insumo->valor_total_reporte ?? 0);
                         @endphp
                         <tr>
                             <td>
@@ -59,8 +60,8 @@
                             </td>
                             <td>{{ $insumo->codigo }}</td>
                             <td>{{ $insumo->unidad_medida }}</td>
-                            <td class="fw-bold {{ $insumo->stock_minimo !== null && $stockTotal <= $insumo->stock_minimo ? 'text-danger' : '' }}">{{ agro_number($stockTotal, 2) }}</td>
-                            <td>{{ agro_number((float) ($insumo->stock_minimo ?? 0), 2) }}</td>
+                            <td class="fw-bold {{ $stockMinimo > 0 && $stockTotal <= $stockMinimo ? 'text-danger' : '' }}">{{ agro_number($stockTotal, 2) }}</td>
+                            <td>{{ agro_number($stockMinimo, 2) }}</td>
                             <td>{{ agro_number($valorTotal, 2) }} Lps</td>
                             <td>
                                 @forelse($insumo->inventarioBodegas as $lote)

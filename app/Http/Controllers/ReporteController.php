@@ -228,7 +228,7 @@ class ReporteController extends Controller
             ->values();
 
         $consumosCategoria = $cultivo->consumos
-            ->sortByDesc('fecha_consumo')
+            ->sortBy('fecha_consumo')
             ->flatMap(function ($consumo) use ($cultivo, $categoriaNormalizada) {
                 $semanaCultivo = $cultivo->calcularSemanaCultivoParaFecha($consumo->fecha_consumo) ?? 'Sin semana';
                 $esManoDeObra = $categoriaNormalizada === 'Mano de Obra';
@@ -249,6 +249,21 @@ class ReporteController extends Controller
                             'subtotal' => (float) $detalle->subtotal,
                         ];
                     });
+            })
+            ->sort(function ($left, $right) {
+                $leftWeek = is_numeric($left->semana_cultivo) ? (int) $left->semana_cultivo : PHP_INT_MAX;
+                $rightWeek = is_numeric($right->semana_cultivo) ? (int) $right->semana_cultivo : PHP_INT_MAX;
+
+                if ($leftWeek !== $rightWeek) {
+                    return $leftWeek <=> $rightWeek;
+                }
+
+                $dateComparison = strcmp((string) $left->fecha_consumo, (string) $right->fecha_consumo);
+                if ($dateComparison !== 0) {
+                    return $dateComparison;
+                }
+
+                return strcmp((string) $left->descripcion, (string) $right->descripcion);
             })
             ->values();
 

@@ -71,23 +71,6 @@
             padding: 1rem;
         }
 
-        .categoria-fechas {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.4rem;
-        }
-
-        .categoria-fecha-chip {
-            display: inline-flex;
-            align-items: center;
-            padding: 0.2rem 0.55rem;
-            border-radius: 999px;
-            background: #eef8f1;
-            color: #166534;
-            font-size: 0.78rem;
-            font-weight: 600;
-        }
-
         .categoria-detail-button {
             border: 1px solid #cfe5d7;
             background: #f7fbf8;
@@ -102,16 +85,6 @@
             background: #198754;
             border-color: #198754;
             color: #fff;
-        }
-
-        .categoria-fecha-filter {
-            cursor: pointer;
-        }
-
-        .categoria-fecha-filter.is-active {
-            background: #198754 !important;
-            color: #fff !important;
-            border-color: #198754 !important;
         }
 
         @media (max-width: 576px) {
@@ -196,8 +169,6 @@
                                         <th>Registros</th>
                                         <th>Cantidad Total</th>
                                         <th>Total</th>
-                                        <th>Rango de Fechas</th>
-                                        <th>Fechas</th>
                                         <th>Detalle</th>
                                     </tr>
                                 </thead>
@@ -209,24 +180,6 @@
                                             <td>{{ agro_number($categoriaItem->cantidad_total, 2) }}</td>
                                             <td>{{ agro_number($categoriaItem->total, 2) }} Lps</td>
                                             <td>
-                                                @if($categoriaItem->ultima_fecha)
-                                                    {{ \Carbon\Carbon::parse($categoriaItem->primera_fecha)->format('d/m/Y') }}
-                                                    al
-                                                    {{ \Carbon\Carbon::parse($categoriaItem->ultima_fecha)->format('d/m/Y') }}
-                                                @else
-                                                    -
-                                                @endif
-                                            </td>
-                                            <td>
-                                                <div class="categoria-fechas">
-                                                    @forelse($categoriaItem->fechas as $fechaCategoria)
-                                                        <span class="categoria-fecha-chip">{{ \Carbon\Carbon::parse($fechaCategoria)->format('d/m/Y') }}</span>
-                                                    @empty
-                                                        <span class="text-muted">Sin fechas</span>
-                                                    @endforelse
-                                                </div>
-                                            </td>
-                                            <td>
                                                 <button
                                                     type="button"
                                                     class="categoria-detail-button"
@@ -235,7 +188,7 @@
                                             </td>
                                         </tr>
                                     @empty
-                                        <tr><td colspan="7" class="text-center text-muted py-3">Sin consumos agrupados por categoría.</td></tr>
+                                        <tr><td colspan="5" class="text-center text-muted py-3">Sin consumos agrupados por categoría.</td></tr>
                                     @endforelse
                                 </tbody>
                             </table>
@@ -294,10 +247,10 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        const selectedDateButton = shell.querySelector('.categoria-fecha-filter.is-active');
-        const selectedActivityButton = shell.querySelector('.categoria-actividad-filter.is-active');
-        const selectedDate = selectedDateButton?.dataset.fecha || '__ALL__';
-        const selectedActivity = selectedActivityButton?.dataset.actividad || '__ALL__';
+        const selectedDateInput = shell.querySelector('.categoria-fecha-select');
+        const selectedActivityInput = shell.querySelector('.categoria-actividad-select');
+        const selectedDate = selectedDateInput?.value || '__ALL__';
+        const selectedActivity = selectedActivityInput?.value || '__ALL__';
         const rows = Array.from(shell.querySelectorAll('tbody tr[data-categoria-fecha]'));
         const totalCell = shell.querySelector('[data-categoria-total]');
 
@@ -413,60 +366,34 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    document.addEventListener('click', function (event) {
-        const filterButton = event.target.closest('.categoria-fecha-filter');
+    document.addEventListener('change', function (event) {
+        const filterSelect = event.target.closest('.categoria-fecha-select');
 
-        if (!filterButton) {
+        if (!filterSelect) {
             return;
         }
 
-        const shell = filterButton.closest('.categoria-detail-card-shell');
+        const shell = filterSelect.closest('.categoria-detail-card-shell');
 
         if (!shell) {
             return;
         }
-
-        const selectedDate = filterButton.dataset.fecha || '__ALL__';
-        const buttons = Array.from(shell.querySelectorAll('.categoria-fecha-filter'));
-        buttons.forEach((button) => button.classList.remove('is-active', 'text-bg-success'));
-        buttons.forEach((button) => {
-            if (!button.classList.contains('text-bg-light')) {
-                button.classList.add('text-bg-light');
-            }
-        });
-
-        filterButton.classList.add('is-active');
-        filterButton.classList.remove('text-bg-light');
-        filterButton.classList.add('text-bg-success');
 
         aplicarFiltrosCategoria(shell);
     });
 
-    document.addEventListener('click', function (event) {
-        const filterButton = event.target.closest('.categoria-actividad-filter');
+    document.addEventListener('change', function (event) {
+        const filterSelect = event.target.closest('.categoria-actividad-select');
 
-        if (!filterButton) {
+        if (!filterSelect) {
             return;
         }
 
-        const shell = filterButton.closest('.categoria-detail-card-shell');
+        const shell = filterSelect.closest('.categoria-detail-card-shell');
 
         if (!shell) {
             return;
         }
-
-        const selectedActivity = filterButton.dataset.actividad || '__ALL__';
-        const buttons = Array.from(shell.querySelectorAll('.categoria-actividad-filter'));
-        buttons.forEach((button) => button.classList.remove('is-active', 'text-bg-success'));
-        buttons.forEach((button) => {
-            if (!button.classList.contains('text-bg-light')) {
-                button.classList.add('text-bg-light');
-            }
-        });
-
-        filterButton.classList.add('is-active');
-        filterButton.classList.remove('text-bg-light');
-        filterButton.classList.add('text-bg-success');
 
         aplicarFiltrosCategoria(shell);
     });

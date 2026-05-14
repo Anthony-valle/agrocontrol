@@ -220,7 +220,21 @@ class EntradaInicialImport implements ToCollection, SkipsEmptyRows, WithChunkRea
         )), 3);
         $costoPromedio = round($this->toFloat($this->obtenerValorFlexible(
             $row,
-            ['costo_promedio', 'costo', 'precio', 'costo_unitario', 'precio_unitario', 'valor_unitario'],
+            [
+                'costo_promedio',
+                'costo_prom',
+                'costo_prome',
+                'costo_promed',
+                'costo promedio',
+                'costo prom',
+                'precio_promedio',
+                'precio promedio',
+                'costo',
+                'precio',
+                'costo_unitario',
+                'precio_unitario',
+                'valor_unitario',
+            ],
             $this->indicesFallback($usaFormatoPlantilla, 'costo_promedio', $this->resolverIndicesRelativos($bodegaIndiceDetectado, [3, 10, 11, 12]))
         )), 4);
         $stockMinimo = round($this->toFloat($this->obtenerValorFlexible(
@@ -1003,6 +1017,9 @@ class EntradaInicialImport implements ToCollection, SkipsEmptyRows, WithChunkRea
         // Alias especial para aceptar exactamente 'Unidad medida base' como 'unidad_medida'
         if ($texto === 'unidad_medida_base' || $texto === 'unidad_medida__base') {
             return 'unidad_medida';
+        }
+        if (in_array($texto, ['costo_promedio', 'costo_prom', 'costo_prome', 'costo_promed', 'precio_promedio'], true)) {
+            return 'costo_promedio';
         }
         if ($texto === 'unidad_medida') {
             return 'unidad_medida';

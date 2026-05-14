@@ -6,6 +6,8 @@ use App\Exports\EntradaInicialTemplateExport;
 use App\Imports\EntradaInicialImport;
 use App\Jobs\ProcesarEntradaInicialImport;
 use App\Models\Bodega;
+use App\Models\Consumo;
+use App\Models\Cultivo;
 use App\Models\FacturaInventario;
 use App\Models\Insumo;
 use App\Models\InventarioBodega;
@@ -96,12 +98,38 @@ class MovimientoInventarioController extends Controller
         $desde = $request->desde;
         $hasta = $request->hasta;
         $search = trim((string) $request->search);
+        $perPage = (int) $request->input('perPage', 10);
+        if (! in_array($perPage, [5, 10, 20], true)) {
+            $perPage = 10;
+        }
+        $consumoDestinoFallback = null;
+
+        if (! Schema::hasColumn('movimiento_inventarios', 'consumo_id')) {
+            $cultivoIdsConsumo = Consumo::query()
+                ->whereNotNull('cultivo_id')
+                ->distinct()
+                ->pluck('cultivo_id')
+                ->filter()
+                ->values();
+
+            if ($cultivoIdsConsumo->count() === 1) {
+                $consumoDestinoFallback = Cultivo::with('lote')->find($cultivoIdsConsumo->first());
+            }
+        }
 
         $movimientos = MovimientoInventario::with([
             'insumo',
             'bodegaOrigen',
             'bodegaDestino',
-
+            'consumo' => function ($query) {
+                $query->withTrashed()->with([
+                    'cultivo' => function ($cultivoQuery) {
+                        $cultivoQuery->withTrashed()->with([
+                            'lote' => fn ($loteQuery) => $loteQuery->withTrashed(),
+                        ]);
+                    },
+                ]);
+            },
         ])
             ->when($tipo, fn($q) => $q->where('tipo', $tipo))
             ->when($desde, fn($q) => $q->whereDate('created_at', '>=', $desde))
@@ -119,9 +147,10 @@ class MovimientoInventarioController extends Controller
                 });
             })
             ->orderBy('created_at', 'desc')
-            ->get();
+            ->paginate($perPage)
+            ->withQueryString();
 
-        return view('modules.movimientos.index', compact('movimientos', 'titulo', 'tipo', 'desde', 'hasta', 'search'));
+        return view('modules.movimientos.index', compact('movimientos', 'titulo', 'tipo', 'desde', 'hasta', 'search', 'consumoDestinoFallback'));
     }
 
     // ----------------------------

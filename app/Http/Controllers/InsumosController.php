@@ -9,6 +9,7 @@ use App\Models\Sucursale;
 use App\Models\Bodega;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -16,6 +17,8 @@ class InsumosController extends Controller
 {
     private array $columnasTablaCache = [];
     private ?array $categoriasPorIdCache = null;
+    private array $costoReporteCache = [];
+    private array $costoMovimientoCache = [];
 
     public function index(){
         $titulo = 'Catálogo de Insumos';
@@ -234,18 +237,53 @@ class InsumosController extends Controller
 
     public function reporteCategoriaDetalle(Categorias $categoria)
     {
-        $insumos = Insumo::with(['inventarioBodegas.bodega.sucursal'])
-            ->where('categoria_nombre', $categoria->nombre)
+        $insumosQuery = Insumo::with(['inventarioBodegas.bodega.sucursal']);
+
+        if (Schema::hasColumn('insumos', 'categoria_nombre')) {
+            $insumosQuery->where('categoria_nombre', $categoria->nombre);
+        } elseif (Schema::hasColumn('insumos', 'categoria_id')) {
+            $insumosQuery->where('categoria_id', $categoria->id);
+        } else {
+            $insumosQuery->whereRaw('1 = 0');
+        }
+
+        $insumos = $insumosQuery
             ->orderBy('nombre')
             ->get();
+
+        $soportaStockMinimo = Schema::hasColumn('insumos', 'stock_minimo');
+
+        $insumos->each(function (Insumo $insumo) use ($soportaStockMinimo): void {
+            $stockMinimo = $soportaStockMinimo ? (float) ($insumo->stock_minimo ?? 0) : 0.0;
+            $valorTotalReporte = 0.0;
+
+            foreach ($insumo->inventarioBodegas as $lote) {
+                $costoReporte = $this->resolverCostoReporteCategoria(
+                    $insumo,
+                    $lote->numero_lote ?? null,
+                    (float) ($lote->costo_promedio ?? 0)
+                );
+
+                $lote->setAttribute('costo_reporte', $costoReporte);
+                $valorTotalReporte += (float) ($lote->stock_actual ?? 0) * $costoReporte;
+            }
+
+            $insumo->setAttribute('stock_minimo_resuelto', $stockMinimo);
+            $insumo->setAttribute('valor_total_reporte', $valorTotalReporte);
+        });
 
         $metricas = [
             'insumos' => $insumos->count(),
             'stock_total' => $insumos->sum(fn ($insumo) => $insumo->inventarioBodegas->sum('stock_actual')),
-            'valor_total' => $insumos->sum(fn ($insumo) => $insumo->inventarioBodegas->sum(fn ($lote) => $lote->stock_actual * $lote->costo_promedio)),
-            'stock_bajo' => $insumos->filter(function ($insumo) {
+            'valor_total' => $insumos->sum(fn ($insumo) => (float) ($insumo->valor_total_reporte ?? 0)),
+            'stock_bajo' => $insumos->filter(function ($insumo) use ($soportaStockMinimo) {
+                if (! $soportaStockMinimo) {
+                    return false;
+                }
+
                 $stock = $insumo->inventarioBodegas->sum('stock_actual');
-                return $insumo->stock_minimo !== null && $stock <= $insumo->stock_minimo;
+
+                return ($insumo->stock_minimo_resuelto ?? 0) > 0 && $stock <= $insumo->stock_minimo_resuelto;
             })->count(),
         ];
 
@@ -255,6 +293,77 @@ class InsumosController extends Controller
     private function resolverIngredienteActivo(Insumo $insumo): string
     {
         return (string) ($insumo->ingrediente_activo ?? $insumo->ingredientes_activo ?? '-');
+    }
+
+    private function resolverCostoReporteCategoria(Insumo $insumo, ?string $numeroLote, float $costoLote): float
+    {
+        if ($costoLote > 0) {
+            return round($costoLote, 4);
+        }
+
+        $cacheKey = $insumo->id . '|' . strtolower(trim((string) ($numeroLote ?? '*')));
+
+        if (array_key_exists($cacheKey, $this->costoReporteCache)) {
+            return $this->costoReporteCache[$cacheKey];
+        }
+
+        $costoInventario = $insumo->inventarioBodegas
+            ->map(fn ($lote) => (float) ($lote->costo_promedio ?? 0))
+            ->first(fn (float $costo) => $costo > 0);
+
+        $costoResuelto = $this->resolverCostoMovimientoCategoria((int) $insumo->id, $numeroLote)
+            ?? ($costoInventario > 0 ? $costoInventario : null)
+            ?? $this->resolverCostoMovimientoCategoria((int) $insumo->id, null)
+            ?? ($this->tablaTieneColumna('insumos', 'costo_estimado') ? (float) ($insumo->costo_estimado ?? 0) : 0);
+
+        $this->costoReporteCache[$cacheKey] = round(max(0, (float) $costoResuelto), 4);
+
+        return $this->costoReporteCache[$cacheKey];
+    }
+
+    private function resolverCostoMovimientoCategoria(int $insumoId, ?string $numeroLote): ?float
+    {
+        $cacheKey = $insumoId . '|' . strtolower(trim((string) ($numeroLote ?? '*')));
+
+        if (array_key_exists($cacheKey, $this->costoMovimientoCache)) {
+            return $this->costoMovimientoCache[$cacheKey];
+        }
+
+        if (! $this->tablaTieneColumna('movimiento_inventarios', 'insumo_id')) {
+            $this->costoMovimientoCache[$cacheKey] = null;
+
+            return null;
+        }
+
+        $precio = null;
+
+        foreach (['precio_unitario', 'costo_unitario'] as $columnaCosto) {
+            if (! $this->tablaTieneColumna('movimiento_inventarios', $columnaCosto)) {
+                continue;
+            }
+
+            $query = DB::table('movimiento_inventarios')
+                ->where('insumo_id', $insumoId)
+                ->where($columnaCosto, '>', 0);
+
+            if ($numeroLote !== null && $this->tablaTieneColumna('movimiento_inventarios', 'numero_lote')) {
+                $query->where('numero_lote', $numeroLote);
+            }
+
+            if ($this->tablaTieneColumna('movimiento_inventarios', 'created_at')) {
+                $query->orderByDesc('created_at');
+            }
+
+            $precio = $query->value($columnaCosto);
+
+            if ($precio !== null) {
+                break;
+            }
+        }
+
+        $this->costoMovimientoCache[$cacheKey] = $precio !== null ? (float) $precio : null;
+
+        return $this->costoMovimientoCache[$cacheKey];
     }
 
     private function resolverCategoriaNombre(Insumo $insumo): string

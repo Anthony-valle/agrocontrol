@@ -35,6 +35,17 @@
             overflow: hidden;
         }
 
+        .categoria-surface-card .pagination {
+            flex-wrap: wrap;
+            gap: 0.25rem;
+        }
+
+        .categoria-surface-card .page-link {
+            min-width: 2.3rem;
+            text-align: center;
+            white-space: nowrap;
+        }
+
         .categoria-mini-kpi {
             border: 1px solid #e4ece7;
             border-radius: 1rem;
@@ -59,6 +70,28 @@
             line-height: 1.1;
             font-weight: 800;
             color: #17324d;
+        }
+
+        #categoria-resumen,
+        #plan-categoria,
+        #real-categoria {
+            scroll-margin-top: 7rem;
+        }
+
+        :target {
+            animation: categoriaTargetFlash 1.6s ease;
+        }
+
+        @keyframes categoriaTargetFlash {
+            0% {
+                box-shadow: 0 0 0 0 rgba(25, 135, 84, 0.32);
+            }
+            35% {
+                box-shadow: 0 0 0 0.35rem rgba(25, 135, 84, 0.18);
+            }
+            100% {
+                box-shadow: none;
+            }
         }
     </style>
     <div class="pagetitle">
@@ -165,10 +198,42 @@ document.addEventListener('DOMContentLoaded', function () {
                 list.appendChild(li);
             }
 
+            function addEllipsis() {
+                const li = document.createElement('li');
+                li.className = 'page-item disabled';
+
+                const span = document.createElement('span');
+                span.className = 'page-link';
+                span.textContent = '...';
+
+                li.appendChild(span);
+                list.appendChild(li);
+            }
+
             addItem('Anterior', Math.max(1, state.page - 1), state.page === 1, false);
 
-            for (let page = 1; page <= totalPages; page += 1) {
+            const windowSize = 2;
+            const startPage = Math.max(1, state.page - windowSize);
+            const endPage = Math.min(totalPages, state.page + windowSize);
+
+            if (startPage > 1) {
+                addItem('1', 1, false, state.page === 1);
+            }
+
+            if (startPage > 2) {
+                addEllipsis();
+            }
+
+            for (let page = startPage; page <= endPage; page += 1) {
                 addItem(String(page), page, false, page === state.page);
+            }
+
+            if (endPage < totalPages - 1) {
+                addEllipsis();
+            }
+
+            if (endPage < totalPages) {
+                addItem(String(totalPages), totalPages, false, state.page === totalPages);
             }
 
             addItem('Siguiente', Math.min(totalPages, state.page + 1), state.page === totalPages, false);

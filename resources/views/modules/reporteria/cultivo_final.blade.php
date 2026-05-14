@@ -82,6 +82,17 @@
             text-decoration: underline;
         }
 
+        .comparison-value-link {
+            color: inherit;
+            font-weight: inherit;
+            text-decoration: none;
+        }
+
+        .comparison-value-link:hover {
+            color: inherit;
+            text-decoration: underline;
+        }
+
         @media print {
             .report-sheet.is-hidden {
                 display: block !important;
@@ -211,26 +222,6 @@
                 </div>
             </div>
         </div>
-
-        <div class="row mt-4">
-            <div class="col-lg-6">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-white fw-bold">Costo Plan vs Real</div>
-                    <div class="card-body">
-                        <canvas id="chartCostoPlanReal" height="220"></canvas>
-                    </div>
-                </div>
-            </div>
-            <div class="col-lg-6">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-white fw-bold">Cosecha Plan vs Real</div>
-                    <div class="card-body">
-                        <canvas id="chartCosechaPlanReal" height="220"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <div class="row mt-4">
             <div class="col-lg-12">
                 <div class="card shadow-sm">
@@ -251,6 +242,10 @@
                                 <tbody>
                                     @forelse($categoryComparisons as $categoria => $comparacion)
                                         @php
+                                            $categoriaDetalleUrl = route('reporte.cultivo.categoria-detalle', $cultivo->id) . '?categoria=' . urlencode($categoria);
+                                            $planAnchorUrl = $categoriaDetalleUrl . '#plan-categoria';
+                                            $realAnchorUrl = $categoriaDetalleUrl . '#real-categoria';
+                                            $resumenAnchorUrl = $categoriaDetalleUrl . '#categoria-resumen';
                                             $realColorClass = $comparacion['sobre_plan_costo'] ? 'text-danger fw-bold' : 'text-primary fw-semibold';
                                             $diffColorClass = $comparacion['sobre_plan_costo'] ? 'text-danger fw-bold' : 'text-primary fw-semibold';
                                         @endphp
@@ -258,15 +253,33 @@
                                             <td>
                                                 <a
                                                     class="categoria-comparison-button"
-                                                    href="{{ route('reporte.cultivo.categoria-detalle', $cultivo->id) }}?categoria={{ urlencode($categoria) }}"
+                                                    href="{{ $resumenAnchorUrl }}"
                                                 >{{ $categoria }}</a>
                                             </td>
-                                            <td>{{ agro_number($comparacion['plan_cantidad'], 2) }}</td>
-                                            <td>{{ agro_number($comparacion['real_cantidad'], 2) }}</td>
-                                            <td class="{{ $realColorClass }}">{{ agro_number($comparacion['real_costo'], 2) }} Lps</td>
-                                            <td>{{ agro_number($comparacion['plan_costo'], 2) }} Lps</td>
+                                            <td>
+                                                <a class="comparison-value-link" href="{{ $planAnchorUrl }}">
+                                                    {{ agro_number($comparacion['plan_cantidad'], 2) }}
+                                                </a>
+                                            </td>
+                                            <td>
+                                                <a class="comparison-value-link" href="{{ $realAnchorUrl }}">
+                                                    {{ agro_number($comparacion['real_cantidad'], 2) }}
+                                                </a>
+                                            </td>
+                                            <td class="{{ $realColorClass }}">
+                                                <a class="comparison-value-link" href="{{ $realAnchorUrl }}">
+                                                    {{ agro_number($comparacion['real_costo'], 2) }} Lps
+                                                </a>
+                                            </td>
+                                            <td>
+                                                <a class="comparison-value-link" href="{{ $planAnchorUrl }}">
+                                                    {{ agro_number($comparacion['plan_costo'], 2) }} Lps
+                                                </a>
+                                            </td>
                                             <td class="{{ $diffColorClass }}">
-                                                {{ agro_number($comparacion['diferencia_costo'], 2) }} Lps
+                                                <a class="comparison-value-link" href="{{ $resumenAnchorUrl }}">
+                                                    {{ agro_number($comparacion['diferencia_costo'], 2) }} Lps
+                                                </a>
                                             </td>
                                         </tr>
                                     @empty
@@ -335,6 +348,27 @@
             </div>
         </div>
 
+
+        <div class="row mt-4">
+            <div class="col-lg-6">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white fw-bold">Costo Plan vs Real</div>
+                    <div class="card-body">
+                        <canvas id="chartCostoPlanReal" height="220"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white fw-bold">Cosecha Plan vs Real</div>
+                    <div class="card-body">
+                        <canvas id="chartCosechaPlanReal" height="220"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        
         <div class="row mt-4">
             <div class="col-lg-12">
                 <div class="card shadow-sm">

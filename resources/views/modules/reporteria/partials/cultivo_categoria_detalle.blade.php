@@ -1,4 +1,4 @@
-<div class="card border-0 shadow-sm mb-0 categoria-resumen-shell">
+<div class="card border-0 shadow-sm mb-0 categoria-resumen-shell" id="categoria-resumen">
     <div class="card-body">
         <div class="row g-3 mb-3">
             <div class="col-md-4">
@@ -19,7 +19,7 @@
 
         <div class="row g-4">
             <div class="col-lg-6">
-                <div class="card h-100 border-0 bg-light-subtle">
+                <div class="card h-100 border-0 bg-light-subtle" id="plan-categoria">
                     <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
                         <span>Plan de la categoria</span>
                         <span class="small text-muted">{{ agro_number($planDetallesCategoria->count()) }} registros</span>
@@ -73,7 +73,7 @@
             </div>
 
             <div class="col-lg-6">
-                <div class="card h-100 border-0 bg-light-subtle">
+                <div class="card h-100 border-0 bg-light-subtle" id="real-categoria">
                     <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
                         <span>Consumo real de la categoria</span>
                         <span class="small text-muted">{{ agro_number($consumosCategoria->count()) }} registros</span>

@@ -157,22 +157,26 @@ class InventarioReportController extends Controller
 
     private function resolverPerPage(Request $request): int
     {
-        $perPage = (int) $request->input('per_page', 50);
+        $perPage = (int) $request->input('per_page', 15);
 
-        return in_array($perPage, [25, 50, 100], true) ? $perPage : 50;
+        return in_array($perPage, [10, 15], true) ? $perPage : 15;
     }
 
     private function calcularMetricasInventario(mixed $query): array
     {
         $hoy = Carbon::today()->toDateString();
         $limite = Carbon::today()->addDays(30)->toDateString();
+        $stockBajoExpr = Schema::hasColumn('insumos', 'stock_minimo')
+            ? 'COALESCE(SUM(CASE WHEN insumos.stock_minimo IS NOT NULL AND inventario_bodegas.stock_actual <= insumos.stock_minimo THEN 1 ELSE 0 END), 0) as stock_bajo'
+            : '0 as stock_bajo';
 
         $metricas = (clone $query)
+            ->reorder()
             ->leftJoin('insumos', 'inventario_bodegas.insumo_id', '=', 'insumos.id')
             ->selectRaw('COUNT(*) as lotes')
             ->selectRaw('COALESCE(SUM(inventario_bodegas.stock_actual), 0) as stock_total')
             ->selectRaw('COALESCE(SUM(inventario_bodegas.stock_actual * inventario_bodegas.costo_promedio), 0) as valor_total')
-            ->selectRaw('COALESCE(SUM(CASE WHEN insumos.stock_minimo IS NOT NULL AND inventario_bodegas.stock_actual <= insumos.stock_minimo THEN 1 ELSE 0 END), 0) as stock_bajo')
+            ->selectRaw($stockBajoExpr)
             ->selectRaw('COALESCE(SUM(CASE WHEN inventario_bodegas.fecha_vencimiento IS NOT NULL AND DATE(inventario_bodegas.fecha_vencimiento) < ? THEN 1 ELSE 0 END), 0) as vencidos', [$hoy])
             ->selectRaw('COALESCE(SUM(CASE WHEN inventario_bodegas.fecha_vencimiento IS NOT NULL AND DATE(inventario_bodegas.fecha_vencimiento) BETWEEN ? AND ? THEN 1 ELSE 0 END), 0) as proximos', [$hoy, $limite])
             ->first();
@@ -190,16 +194,23 @@ class InventarioReportController extends Controller
     private function resumenCategoriasInventario(mixed $query)
     {
         $categoriaExpr = $this->categoriaSqlExpression();
+        $categoryGroupBy = $this->categoriaGroupByExpression();
 
-        return (clone $query)
+        $summaryQuery = (clone $query)
+            ->reorder()
             ->leftJoin('insumos', 'inventario_bodegas.insumo_id', '=', 'insumos.id')
             ->leftJoin('categorias', 'insumos.categoria_id', '=', 'categorias.id')
             ->selectRaw($categoriaExpr . ' as categoria')
             ->selectRaw('COUNT(*) as lotes')
             ->selectRaw('COALESCE(SUM(inventario_bodegas.stock_actual), 0) as stock')
             ->selectRaw('COALESCE(SUM(inventario_bodegas.stock_actual * inventario_bodegas.costo_promedio), 0) as valor')
-            ->groupBy(DB::raw($categoriaExpr))
-            ->orderByDesc('valor')
+            ->orderByDesc('valor');
+
+        if ($categoryGroupBy !== null) {
+            $summaryQuery->groupBy(DB::raw($categoryGroupBy));
+        }
+
+        return $summaryQuery
             ->get()
             ->map(fn ($fila) => [
                 'categoria' => (string) ($fila->categoria ?: 'Sin categoría'),
@@ -220,5 +231,18 @@ class InventarioReportController extends Controller
         }
 
         return "'Sin categoría'";
+    }
+
+    private function categoriaGroupByExpression(): ?string
+    {
+        if (Schema::hasColumn('insumos', 'categoria_nombre')) {
+            return 'insumos.categoria_nombre';
+        }
+
+        if (Schema::hasColumn('insumos', 'categoria_id')) {
+            return 'categorias.nombre';
+        }
+
+        return null;
     }
 }

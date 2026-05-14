@@ -31,49 +31,51 @@
                 <div class="small text-muted">{{ agro_number($totalCategoria, 2) }} Lps</div>
             </div>
             <div class="col-12">
-                <div class="d-flex flex-wrap gap-2 justify-content-end">
-                    <a href="{{ route('reporteria.cultivos.consumos-categoria.excel', ['cultivo' => $cultivo->id, 'categoria' => $categoria, 'fecha' => $selectedFecha ?: null, 'actividad' => $selectedActividad ?: null]) }}" class="btn btn-success btn-sm categoria-export-link" data-export-type="excel">
-                        <i class="fa-solid fa-file-excel me-1"></i> Descargar Excel
-                    </a>
-                    <a href="{{ route('reporteria.cultivos.consumos-categoria.pdf', ['cultivo' => $cultivo->id, 'categoria' => $categoria, 'fecha' => $selectedFecha ?: null, 'actividad' => $selectedActividad ?: null]) }}" class="btn btn-danger btn-sm categoria-export-link" data-export-type="pdf">
-                        <i class="fa-solid fa-file-pdf me-1"></i> Descargar PDF
-                    </a>
-                </div>
-            </div>
-            <div class="col-12">
-                <label class="fw-bold d-block text-muted small uppercase">Fechas relacionadas</label>
-                <div class="d-flex flex-wrap gap-2 mt-1">
-                    <button type="button" class="badge text-bg-success border-0 categoria-fecha-filter is-active" data-fecha="__ALL__">Todas</button>
-                    @forelse($fechasCategoria as $fechaCategoria)
-                        <button
-                            type="button"
-                            class="badge text-bg-light border categoria-fecha-filter"
-                            data-fecha="{{ $fechaCategoria }}"
-                        >{{ \Carbon\Carbon::parse($fechaCategoria)->format('d/m/Y') }}</button>
-                    @empty
-                        <span class="text-muted">Sin fechas relacionadas.</span>
-                    @endforelse
-                </div>
-                <div class="small text-muted mt-2 categoria-fecha-filter-info">
-                    Mostrando todos los registros de la categoría.
-                </div>
-            </div>
-            <div class="col-12">
-                <label class="fw-bold d-block text-muted small uppercase">Actividades relacionadas</label>
-                <div class="d-flex flex-wrap gap-2 mt-1">
-                    <button type="button" class="badge text-bg-success border-0 categoria-actividad-filter is-active" data-actividad="__ALL__">Todas</button>
-                    @forelse($actividadesCategoria as $actividadCategoria)
-                        <button
-                            type="button"
-                            class="badge text-bg-light border categoria-actividad-filter"
-                            data-actividad="{{ $actividadCategoria }}"
-                        >{{ $actividadCategoria }}</button>
-                    @empty
-                        <span class="text-muted">Sin actividades relacionadas.</span>
-                    @endforelse
-                </div>
-                <div class="small text-muted mt-2 categoria-actividad-filter-info">
-                    Mostrando todas las actividades de la categoría.
+                <div class="row g-3 align-items-end">
+                    <div class="col-lg-3 col-md-4">
+                        <label class="fw-bold d-block text-muted small uppercase">Fechas relacionadas</label>
+                        <select class="form-select form-select-sm mt-1 categoria-fecha-select" {{ $fechasCategoria->isEmpty() ? 'disabled' : '' }}>
+                            <option value="__ALL__">Todas</option>
+                            @foreach($fechasCategoria as $fechaCategoria)
+                                <option value="{{ $fechaCategoria }}" {{ $selectedFecha === $fechaCategoria ? 'selected' : '' }}>
+                                    {{ \Carbon\Carbon::parse($fechaCategoria)->format('d/m/Y') }}
+                                </option>
+                            @endforeach
+                        </select>
+                        @if($fechasCategoria->isEmpty())
+                            <div class="small text-muted mt-2">Sin fechas relacionadas.</div>
+                        @endif
+                        <div class="small text-muted mt-2 categoria-fecha-filter-info">
+                            Mostrando todos los registros de la categoría.
+                        </div>
+                    </div>
+                    <div class="col-lg-5 col-md-8">
+                        <label class="fw-bold d-block text-muted small uppercase">Actividades relacionadas</label>
+                        <select class="form-select form-select-sm mt-1 categoria-actividad-select" {{ $actividadesCategoria->isEmpty() ? 'disabled' : '' }}>
+                            <option value="__ALL__">Todas</option>
+                            @foreach($actividadesCategoria as $actividadCategoria)
+                                <option value="{{ $actividadCategoria }}" {{ $selectedActividad === $actividadCategoria ? 'selected' : '' }}>
+                                    {{ $actividadCategoria }}
+                                </option>
+                            @endforeach
+                        </select>
+                        @if($actividadesCategoria->isEmpty())
+                            <div class="small text-muted mt-2">Sin actividades relacionadas.</div>
+                        @endif
+                        <div class="small text-muted mt-2 categoria-actividad-filter-info">
+                            Mostrando todas las actividades de la categoría.
+                        </div>
+                    </div>
+                    <div class="col-lg-4 col-md-12">
+                        <div class="d-grid gap-2 d-sm-flex justify-content-lg-end mt-1">
+                            <a href="{{ route('reporteria.cultivos.consumos-categoria.excel', ['cultivo' => $cultivo->id, 'categoria' => $categoria, 'fecha' => $selectedFecha ?: null, 'actividad' => $selectedActividad ?: null]) }}" class="btn btn-success btn-sm categoria-export-link" data-export-type="excel">
+                                <i class="fa-solid fa-file-excel me-1"></i> Descargar Excel
+                            </a>
+                            <a href="{{ route('reporteria.cultivos.consumos-categoria.pdf', ['cultivo' => $cultivo->id, 'categoria' => $categoria, 'fecha' => $selectedFecha ?: null, 'actividad' => $selectedActividad ?: null]) }}" class="btn btn-danger btn-sm categoria-export-link" data-export-type="pdf">
+                                <i class="fa-solid fa-file-pdf me-1"></i> Descargar PDF
+                            </a>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

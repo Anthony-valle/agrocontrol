@@ -3,6 +3,27 @@
 @section('titulo', $titulo)
 
 @section('contenido')
+<style>
+    .categoria-estado-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.35rem 0.75rem;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+
+    .categoria-estado-badge.activo {
+        background-color: #d1fae5;
+        color: #065f46;
+    }
+
+    .categoria-estado-badge.inactivo {
+        background-color: #fee2e2;
+        color: #991b1b;
+    }
+</style>
 <main id="main" class="main">
 
     <div class="pagetitle">
@@ -67,7 +88,14 @@
                                         <td>{{ $item->id }}</td>
                                         <td>{{ $item->nombre }}</td>
                                         <td>{{ $item->sucursal->nombre ?? 'Sistema' }}</td>
-                                        <td>{{ isset($item->estado) ? ((int) $item->estado === 1 ? 'Activo' : 'Inactivo') : 'Activo' }}</td>
+                                        <td>
+                                            @php
+                                                $estadoActivo = !isset($item->estado) || (int) $item->estado === 1;
+                                            @endphp
+                                            <span class="categoria-estado-badge {{ $estadoActivo ? 'activo' : 'inactivo' }}">
+                                                {{ $estadoActivo ? 'Activo' : 'Inactivo' }}
+                                            </span>
+                                        </td>
                                         <td>{{ $item->creador?->usuario ?? 'Sistema' }}</td>
                                         <td class="text-center text-nowrap">
                                             <button class="btn btn-warning btn-sm btnEditarCategoria" data-id="{{ $item->id }}">
