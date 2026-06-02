@@ -17,13 +17,13 @@
         <div class="d-flex flex-wrap align-items-center mb-3 p-2 bg-white rounded shadow-sm gap-2 border">
             <form method="GET" action="{{ route('movimientos.index') }}" class="d-flex flex-wrap align-items-center gap-2 w-100">
 
-                <div class="d-flex align-items-center gap-1 border-end pe-2">
-                    <select name="perPage" id="perPage" class="form-select form-select-sm" style="width: 70px;">
+                <div class="d-flex align-items-center gap-1 border-end pe-2 agro-toolbar-records">
+                    <select name="perPage" id="perPage" class="form-select form-select-sm agro-toolbar-select" style="width: 70px;">
                         <option value="5" {{ request('perPage')=='5'?'selected':'' }}>5</option>
                         <option value="10" {{ request('perPage')=='10' || !request('perPage')?'selected':'' }}>10</option>
                         <option value="20" {{ request('perPage')=='20'?'selected':'' }}>20</option>
                     </select>
-                    <small class="text-muted" style="font-size: 0.75rem;">Registros</small>
+                    <small class="text-muted text-nowrap" style="font-size: 0.75rem;">Registros</small>
                 </div>
 
                 <div class="input-group input-group-sm" style="width: 200px;">

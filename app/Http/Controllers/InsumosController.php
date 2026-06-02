@@ -29,6 +29,7 @@ class InsumosController extends Controller
             $insumo->setAttribute('categoria_nombre_resuelto', $this->resolverCategoriaNombre($insumo));
             $insumo->setAttribute('stock_minimo_resuelto', $insumo->stock_minimo ?? 0);
             $insumo->setAttribute('estado_resuelto', ! $this->tablaTieneColumna('insumos', 'estado') || (int) ($insumo->estado ?? 1) === 1);
+            $insumo->setAttribute('bloqueo_motivo_resuelto', $this->tablaTieneColumna('insumos', 'bloqueo_motivo') ? trim((string) ($insumo->bloqueo_motivo ?? '')) : '');
         });
 
         return view('modules.insumos.index', compact('titulo','insumos'));
@@ -193,8 +194,43 @@ class InsumosController extends Controller
         return back()->with('success','Insumo eliminado correctamente.');
     }
 
+    public function cambiarEstado(Request $request, Insumo $insumo)
+    {
+        $request->validate([
+            'estado' => 'required|in:0,1',
+            'motivo' => 'nullable|string|max:1000',
+        ]);
+
+        $estado = (int) $request->input('estado');
+        $motivo = trim((string) $request->input('motivo', ''));
+
+        if ($estado === 0 && $motivo === '') {
+            return response()->json([
+                'errors' => [
+                    'motivo' => ['Debes indicar el motivo del bloqueo.'],
+                ],
+            ], 422);
+        }
+
+        if ($estado === 0) {
+            $insumo->bloquear($motivo, Auth::id());
+            $mensaje = 'Insumo bloqueado correctamente.';
+        } else {
+            $insumo->reactivar(Auth::id());
+            $mensaje = 'Insumo reactivado correctamente.';
+        }
+
+        if ($request->ajax() || $request->expectsJson()) {
+            return response()->json(['success' => $mensaje], 200);
+        }
+
+        return back()->with('success', $mensaje);
+    }
+
      // Importar formulario
     public function importar() {
+        $this->authorizeMassImports();
+
         $titulo = 'Importar Insumos';
         return view('modules.insumos.importar', compact('titulo'));
     }
@@ -202,6 +238,8 @@ class InsumosController extends Controller
     // Importar Excel
     public function importarExcel(Request $request)
     {
+        $this->authorizeMassImports();
+
         $request->validate([
             'archivo_excel' => 'required|file|mimes:xlsx,xls,csv'
         ]);
@@ -226,6 +264,13 @@ class InsumosController extends Controller
         }
     }
 
+    private function authorizeMassImports(): void
+    {
+        $user = Auth::user();
+
+        abort_unless($user instanceof \App\Models\User && $user->canManageMassImports(), 403);
+    }
+
     public function reporteCategoriaView()
     {
         $categorias = Categorias::orderBy('nombre')->get(['id', 'nombre'])
@@ -237,7 +282,7 @@ class InsumosController extends Controller
 
     public function reporteCategoriaDetalle(Categorias $categoria)
     {
-        $insumosQuery = Insumo::with(['inventarioBodegas.bodega.sucursal']);
+        $insumosQuery = Insumo::with(['inventarioBodegas.bodega.sucursal'])->activos();
 
         if (Schema::hasColumn('insumos', 'categoria_nombre')) {
             $insumosQuery->where('categoria_nombre', $categoria->nombre);
@@ -258,6 +303,7 @@ class InsumosController extends Controller
             $valorTotalReporte = 0.0;
 
             foreach ($insumo->inventarioBodegas as $lote) {
+
                 $costoReporte = $this->resolverCostoReporteCategoria(
                     $insumo,
                     $lote->numero_lote ?? null,

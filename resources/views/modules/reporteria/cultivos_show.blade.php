@@ -235,6 +235,17 @@ document.addEventListener('DOMContentLoaded', function () {
     const categoriaDetailContainer = document.getElementById('categoriaDetailContainer');
     const categoriaButtons = Array.from(document.querySelectorAll('.categoria-detail-button'));
 
+    function normalizeSearchText(value) {
+        return (value || '')
+            .toString()
+            .trim()
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]+/g, ' ')
+            .trim();
+    }
+
     function formatNumber(value) {
         return new Intl.NumberFormat('en-US', {
             minimumFractionDigits: 2,
@@ -250,7 +261,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const selectedDateInput = shell.querySelector('.categoria-fecha-select');
         const selectedActivityInput = shell.querySelector('.categoria-actividad-select');
         const selectedDate = selectedDateInput?.value || '__ALL__';
-        const selectedActivity = selectedActivityInput?.value || '__ALL__';
+        const selectedActivity = (selectedActivityInput?.value || '').trim();
         const rows = Array.from(shell.querySelectorAll('tbody tr[data-categoria-fecha]'));
         const totalCell = shell.querySelector('[data-categoria-total]');
 
@@ -259,7 +270,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
         rows.forEach((row) => {
             const matchesDate = selectedDate === '__ALL__' || row.dataset.categoriaFecha === selectedDate;
-            const matchesActivity = selectedActivity === '__ALL__' || row.dataset.categoriaActividad === selectedActivity;
+            const searchText = normalizeSearchText(row.dataset.categoriaBusqueda || row.dataset.categoriaActividad || '');
+            const matchesActivity = selectedActivity === '' || searchText.includes(normalizeSearchText(selectedActivity));
             const matches = matchesDate && matchesActivity;
             row.style.display = matches ? '' : 'none';
 
@@ -276,28 +288,28 @@ document.addEventListener('DOMContentLoaded', function () {
         const fechaInfo = shell.querySelector('.categoria-fecha-filter-info');
         if (fechaInfo) {
             if (selectedDate === '__ALL__') {
-                fechaInfo.textContent = selectedActivity === '__ALL__'
+                fechaInfo.textContent = selectedActivity === ''
                     ? 'Mostrando todos los registros de la categoría.'
-                    : `Mostrando ${visibleCount} registros para la actividad ${selectedActivity}.`;
+                    : `Mostrando ${visibleCount} registros para la búsqueda ${selectedActivity}.`;
             } else {
                 const [year, month, day] = selectedDate.split('-');
                 const label = day && month && year ? `${day}/${month}/${year}` : selectedDate;
-                fechaInfo.textContent = selectedActivity === '__ALL__'
+                fechaInfo.textContent = selectedActivity === ''
                     ? `Mostrando ${visibleCount} registros para la fecha ${label}.`
-                    : `Mostrando ${visibleCount} registros para la fecha ${label} y la actividad ${selectedActivity}.`;
+                    : `Mostrando ${visibleCount} registros para la fecha ${label} y la búsqueda ${selectedActivity}.`;
             }
         }
 
         const actividadInfo = shell.querySelector('.categoria-actividad-filter-info');
         if (actividadInfo) {
-            if (selectedActivity === '__ALL__') {
+            if (selectedActivity === '') {
                 actividadInfo.textContent = selectedDate === '__ALL__'
-                    ? 'Mostrando todas las actividades de la categoría.'
+                    ? 'Mostrando todos los insumos y descripciones de la categoría.'
                     : `Mostrando ${visibleCount} registros para la fecha seleccionada.`;
             } else {
                 actividadInfo.textContent = selectedDate === '__ALL__'
-                    ? `Mostrando ${visibleCount} registros para la actividad ${selectedActivity}.`
-                    : `Mostrando ${visibleCount} registros para la actividad ${selectedActivity} en la fecha seleccionada.`;
+                    ? `Mostrando ${visibleCount} registros para la búsqueda ${selectedActivity}.`
+                    : `Mostrando ${visibleCount} registros para la búsqueda ${selectedActivity} en la fecha seleccionada.`;
             }
         }
 
@@ -322,9 +334,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 url.searchParams.delete('fecha');
             }
 
-            if (selectedActivity !== '__ALL__') {
-                url.searchParams.set('actividad', selectedActivity);
+            if (selectedActivity !== '') {
+                url.searchParams.set('descripcion', selectedActivity);
             } else {
+                url.searchParams.delete('descripcion');
                 url.searchParams.delete('actividad');
             }
 
@@ -382,7 +395,7 @@ document.addEventListener('DOMContentLoaded', function () {
         aplicarFiltrosCategoria(shell);
     });
 
-    document.addEventListener('change', function (event) {
+    document.addEventListener('input', function (event) {
         const filterSelect = event.target.closest('.categoria-actividad-select');
 
         if (!filterSelect) {

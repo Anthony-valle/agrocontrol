@@ -162,10 +162,40 @@
                 ul.appendChild(li);
             }
 
+            function addEllipsis() {
+                const li = document.createElement('li');
+                li.className = 'page-item disabled';
+
+                const span = document.createElement('span');
+                span.className = 'page-link';
+                span.textContent = '...';
+
+                li.appendChild(span);
+                ul.appendChild(li);
+            }
+
+            const windowSize = 2;
+            const startPage = Math.max(1, state.currentPage - windowSize);
+            const endPage = Math.min(totalPages, state.currentPage + windowSize);
+
             addItem('Anterior', Math.max(1, state.currentPage - 1), state.currentPage === 1, false);
 
-            for (let page = 1; page <= totalPages; page += 1) {
+            if (startPage > 1) {
+                addItem('1', 1, false, state.currentPage === 1);
+                if (startPage > 2) {
+                    addEllipsis();
+                }
+            }
+
+            for (let page = startPage; page <= endPage; page += 1) {
                 addItem(String(page), page, false, page === state.currentPage);
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    addEllipsis();
+                }
+                addItem(String(totalPages), totalPages, false, state.currentPage === totalPages);
             }
 
             addItem('Siguiente', Math.min(totalPages, state.currentPage + 1), state.currentPage === totalPages, false);

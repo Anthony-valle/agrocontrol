@@ -7,6 +7,7 @@ use App\Models\Cultivo;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -407,6 +408,30 @@ class ReporteController extends Controller
         ]);
     }
 
+    public function reportePlanRealSemanal(int $cultivo_id)
+    {
+        $cultivo = Cultivo::with(['consumos.detalles.insumo', 'planes.detalles'])->findOrFail($cultivo_id);
+
+        return view('modules.reporteria.cultivo_plan_real_semanal', $this->buildPlanRealSemanalReportData($cultivo));
+    }
+
+    public function reportePlanRealSemanalExcel(int $cultivo_id)
+    {
+        $cultivo = Cultivo::with(['consumos.detalles.insumo', 'planes.detalles'])->findOrFail($cultivo_id);
+        $reportData = $this->buildPlanRealSemanalReportData($cultivo);
+
+        return Excel::download(
+            new \App\Exports\CultivoPlanRealSemanalExport(
+                $cultivo,
+                $reportData['plan'],
+                $reportData['comparaciones'],
+                $reportData['resumenEstados'],
+                $reportData['resumenSemanas']
+            ),
+            'plan_real_semanal_cultivo_' . $cultivo->id . '_' . now()->format('Ymd_His') . '.xlsx'
+        );
+    }
+
     public function historialConsumoExcel(Request $request, int $cultivo_id)
     {
         $cultivo = Cultivo::with(['consumos.detalles.insumo'])
@@ -480,9 +505,252 @@ class ReporteController extends Controller
             ->orderByDesc('fecha_consumo');
     }
 
+    private function buildPlanRealSemanalReportData(Cultivo $cultivo): array
+    {
+        $plan = $cultivo->planes->sortByDesc('fecha_plan')->first();
+        $planDetalles = collect($plan?->detalles ?? []);
+
+        $planRows = $planDetalles->map(function ($detalle) {
+            $semana = (int) ($detalle->semana ?? 0);
+            $categoria = $this->normalizarCategoriaReporte($detalle->categoria);
+            $concepto = trim((string) ($detalle->descripcion ?? ''));
+
+            return [
+                'key' => $this->buildPlanRealComparisonKey($semana, $categoria, $concepto),
+                'semana' => $semana,
+                'categoria' => $categoria,
+                'concepto' => $concepto !== '' ? $concepto : 'Sin descripcion',
+                'cantidad_plan' => (float) ($detalle->cantidad_estimada ?? 0),
+                'cantidad_real' => 0.0,
+                'unidad_medida' => (string) ($detalle->unidad_medida ?? '-'),
+                'costo_plan' => (float) ($detalle->subtotal ?? 0),
+                'costo_real' => 0.0,
+                'plan_items' => [[
+                    'descripcion' => $concepto !== '' ? $concepto : 'Sin descripcion',
+                    'cantidad' => (float) ($detalle->cantidad_estimada ?? 0),
+                    'unidad_medida' => (string) ($detalle->unidad_medida ?? '-'),
+                    'subtotal' => (float) ($detalle->subtotal ?? 0),
+                ]],
+                'real_items' => [],
+            ];
+        });
+
+        $realRows = $cultivo->consumos
+            ->sortBy('fecha_consumo')
+            ->flatMap(function ($consumo) use ($cultivo) {
+                $semanaCultivo = $cultivo->calcularSemanaCultivoParaFecha($consumo->fecha_consumo);
+
+                return $consumo->detalles->map(function ($detalle) use ($consumo, $semanaCultivo) {
+                    $categoria = $this->normalizarCategoriaReporte($detalle->categoria);
+                    $conceptoBase = trim((string) ($detalle->insumo->nombre ?? $detalle->descripcion ?? ''));
+
+                    return [
+                        'key' => $this->buildPlanRealComparisonKey((int) ($semanaCultivo ?? 0), $categoria, $conceptoBase),
+                        'semana' => (int) ($semanaCultivo ?? 0),
+                        'categoria' => $categoria,
+                        'concepto' => $conceptoBase !== '' ? $conceptoBase : 'Sin descripcion',
+                        'cantidad_plan' => 0.0,
+                        'cantidad_real' => (float) ($detalle->cantidad ?? 0),
+                        'unidad_medida' => (string) ($detalle->unidad_medida ?? $detalle->insumo->unidad_medida ?? '-'),
+                        'costo_plan' => 0.0,
+                        'costo_real' => (float) ($detalle->subtotal ?? 0),
+                        'plan_items' => [],
+                        'real_items' => [[
+                            'consumo_id' => $consumo->id,
+                            'fecha_consumo' => $consumo->fecha_consumo,
+                            'descripcion' => $conceptoBase !== '' ? $conceptoBase : 'Sin descripcion',
+                            'cantidad' => (float) ($detalle->cantidad ?? 0),
+                            'unidad_medida' => (string) ($detalle->unidad_medida ?? $detalle->insumo->unidad_medida ?? '-'),
+                            'subtotal' => (float) ($detalle->subtotal ?? 0),
+                        ]],
+                    ];
+                });
+            });
+
+        $realItemsRelacionados = $realRows
+            ->flatMap(function (array $row) {
+                return collect($row['real_items'] ?? [])->map(function (array $item) use ($row) {
+                    return [
+                        'semana' => (int) ($row['semana'] ?? 0),
+                        'categoria' => (string) ($row['categoria'] ?? 'Otros Insumos'),
+                        'descripcion' => $item['descripcion'] ?? 'Sin descripcion',
+                        'fecha_consumo' => $item['fecha_consumo'] ?? null,
+                        'cantidad' => (float) ($item['cantidad'] ?? 0),
+                        'unidad_medida' => (string) ($item['unidad_medida'] ?? '-'),
+                        'subtotal' => (float) ($item['subtotal'] ?? 0),
+                    ];
+                });
+            })
+            ->groupBy(function (array $item) {
+                return $this->buildPlanRealComparisonKey(
+                    (int) ($item['semana'] ?? 0),
+                    (string) ($item['categoria'] ?? 'Otros Insumos'),
+                    ''
+                );
+            });
+
+        $comparaciones = $planRows
+            ->concat($realRows)
+            ->groupBy('key')
+            ->map(function (Collection $items) {
+                $base = $items->first();
+                $cantidadPlan = (float) $items->sum('cantidad_plan');
+                $cantidadReal = (float) $items->sum('cantidad_real');
+                $costoPlan = (float) $items->sum('costo_plan');
+                $costoReal = (float) $items->sum('costo_real');
+
+                return [
+                    'semana' => (int) ($base['semana'] ?? 0),
+                    'categoria' => $base['categoria'] ?? 'Otros Insumos',
+                    'concepto' => $base['concepto'] ?? 'Sin descripcion',
+                    'cantidad_plan' => $cantidadPlan,
+                    'cantidad_real' => $cantidadReal,
+                    'unidad_medida' => $base['unidad_medida'] ?? '-',
+                    'costo_plan' => $costoPlan,
+                    'costo_real' => $costoReal,
+                    'diferencia_cantidad' => $cantidadReal - $cantidadPlan,
+                    'diferencia_costo' => $costoReal - $costoPlan,
+                    'estado' => $this->resolverEstadoPlanReal($cantidadPlan, $cantidadReal, $costoPlan, $costoReal),
+                    'plan_items' => $items->flatMap(fn (array $item) => $item['plan_items'])->values(),
+                    'real_items' => $items->flatMap(fn (array $item) => $item['real_items'])->values(),
+                ];
+            })
+            ->map(function (array $fila) use ($realItemsRelacionados) {
+                $relacionadosKey = $this->buildPlanRealComparisonKey(
+                    (int) ($fila['semana'] ?? 0),
+                    (string) ($fila['categoria'] ?? 'Otros Insumos'),
+                    ''
+                );
+
+                $relacionados = collect($realItemsRelacionados->get($relacionadosKey, []))
+                    ->filter(function (array $item) use ($fila) {
+                        return $this->normalizarTextoComparacion($item['descripcion'] ?? '')
+                            !== $this->normalizarTextoComparacion($fila['concepto'] ?? '');
+                    })
+                    ->values();
+
+                $fila['real_items_relacionados'] = $relacionados;
+
+                return $fila;
+            })
+            ->sort(function (array $left, array $right) {
+                if ($left['semana'] !== $right['semana']) {
+                    return $left['semana'] <=> $right['semana'];
+                }
+
+                $categoriaComparacion = strcmp((string) $left['categoria'], (string) $right['categoria']);
+                if ($categoriaComparacion !== 0) {
+                    return $categoriaComparacion;
+                }
+
+                return strcmp((string) $left['concepto'], (string) $right['concepto']);
+            })
+            ->values();
+
+        $resumenEstados = $comparaciones
+            ->groupBy('estado')
+            ->map(fn (Collection $items, string $estado) => [
+                'estado' => $estado,
+                'registros' => $items->count(),
+                'costo_plan' => (float) $items->sum('costo_plan'),
+                'costo_real' => (float) $items->sum('costo_real'),
+            ])
+            ->sortByDesc('registros')
+            ->values();
+
+        $resumenSemanas = $comparaciones
+            ->groupBy('semana')
+            ->map(fn (Collection $items, int|string $semana) => [
+                'semana' => (int) $semana,
+                'registros' => $items->count(),
+                'pendientes' => $items->where('estado', 'Plan sin real')->count(),
+                'no_planificados' => $items->where('estado', 'Real sin plan')->count(),
+                'desvios' => $items->filter(fn (array $item) => in_array($item['estado'], ['Diferencia de cantidad', 'Diferencia de costo', 'Diferencia de cantidad y costo'], true))->count(),
+                'costo_plan' => (float) $items->sum('costo_plan'),
+                'costo_real' => (float) $items->sum('costo_real'),
+            ])
+            ->sortBy('semana')
+            ->values();
+
+        return [
+            'cultivo' => $cultivo,
+            'plan' => $plan,
+            'comparaciones' => $comparaciones,
+            'resumenEstados' => $resumenEstados,
+            'resumenSemanas' => $resumenSemanas,
+            'totales' => [
+                'registros' => $comparaciones->count(),
+                'cantidad_plan' => (float) $comparaciones->sum('cantidad_plan'),
+                'cantidad_real' => (float) $comparaciones->sum('cantidad_real'),
+                'costo_plan' => (float) $comparaciones->sum('costo_plan'),
+                'costo_real' => (float) $comparaciones->sum('costo_real'),
+                'pendientes' => $comparaciones->where('estado', 'Plan sin real')->count(),
+                'no_planificados' => $comparaciones->where('estado', 'Real sin plan')->count(),
+                'desvios' => $comparaciones->filter(fn (array $item) => in_array($item['estado'], ['Diferencia de cantidad', 'Diferencia de costo', 'Diferencia de cantidad y costo'], true))->count(),
+            ],
+            'filtros' => [
+                'semanas' => $comparaciones->pluck('semana')->filter(fn ($semana) => $semana > 0)->unique()->sort()->values(),
+                'categorias' => $comparaciones->pluck('categoria')->filter()->unique()->sort()->values(),
+                'estados' => $comparaciones->pluck('estado')->filter()->unique()->sort()->values(),
+            ],
+        ];
+    }
+
     private function cosechaFacturasDisponible(): bool
     {
         return Schema::hasTable('cosecha_facturas');
+    }
+
+    private function resolverEstadoPlanReal(float $cantidadPlan, float $cantidadReal, float $costoPlan, float $costoReal): string
+    {
+        $tolerancia = 0.0001;
+        $hayPlan = abs($cantidadPlan) > $tolerancia || abs($costoPlan) > $tolerancia;
+        $hayReal = abs($cantidadReal) > $tolerancia || abs($costoReal) > $tolerancia;
+
+        if ($hayPlan && ! $hayReal) {
+            return 'Plan sin real';
+        }
+
+        if (! $hayPlan && $hayReal) {
+            return 'Real sin plan';
+        }
+
+        $difiereCantidad = abs($cantidadReal - $cantidadPlan) > $tolerancia;
+        $difiereCosto = abs($costoReal - $costoPlan) > $tolerancia;
+
+        if ($difiereCantidad && $difiereCosto) {
+            return 'Diferencia de cantidad y costo';
+        }
+
+        if ($difiereCantidad) {
+            return 'Diferencia de cantidad';
+        }
+
+        if ($difiereCosto) {
+            return 'Diferencia de costo';
+        }
+
+        return 'Coincide';
+    }
+
+    private function buildPlanRealComparisonKey(int $semana, string $categoria, string $concepto): string
+    {
+        return implode('|', [
+            max($semana, 0),
+            $this->normalizarTextoComparacion($categoria),
+            $this->normalizarTextoComparacion($concepto),
+        ]);
+    }
+
+    private function normalizarTextoComparacion(mixed $valor): string
+    {
+        $normalizado = trim((string) ($valor ?? ''));
+        $normalizado = mb_strtolower($normalizado, 'UTF-8');
+        $transliterado = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $normalizado);
+        $normalizado = $transliterado !== false ? $transliterado : $normalizado;
+        $normalizado = preg_replace('/[^a-z0-9]+/', ' ', $normalizado) ?? $normalizado;
+
+        return trim(preg_replace('/\s+/', ' ', $normalizado) ?? $normalizado);
     }
 
     private function normalizarCategoriaReporte(mixed $categoria): string

@@ -21,74 +21,49 @@ class PlanesCultivoImport implements ToCollection, WithHeadingRow, SkipsEmptyRow
     use RemembersChunkOffset;
 
     protected int $userId;
-    protected ?int $planIdBase;
-    protected ?Collection $planesCache = null;
     protected array $planesImportadosCache = [];
-    protected ?array $planImportacionUnica = null;
-
+    protected array $columnasPorTabla = [];
+    protected array $cultivosPorId = [];
+    protected array $cultivosPorCodigo = [];
+    protected array $cultivosPorNombre = [];
     protected array $stats = [
         'filas_procesadas' => 0,
         'filas_omitidas' => 0,
         'filas_error' => 0,
-        'filas_plan_base_invalido' => 0,
-        'filas_plan_id_usado_como_cultivo_id' => 0,
         'filas_con_fecha_por_defecto' => 0,
+        'filas_multiplicadas_por_hectareas' => 0,
         'planes_creados' => 0,
-        'planes_actualizados' => 0,
         'detalles_creados' => 0,
     ];
 
     protected array $errores = [];
 
-    public function __construct(int $userId, ?int $planIdBase = null)
+    public function __construct(int $userId)
     {
         $this->userId = $userId;
-        $this->planIdBase = $planIdBase;
     }
 
     public function collection(Collection $rows): void
     {
+        @set_time_limit(0);
+        @ini_set('max_execution_time', '0');
+        @ini_set('memory_limit', '1024M');
+
         $grupos = [];
 
         foreach ($rows as $index => $row) {
             $this->stats['filas_procesadas']++;
             $fila = $this->getCurrentChunkOffset() + $index;
 
-            $planIdRaw = $this->obtenerValor($row, ['plan_id_base', 'plan_id', 'id_plan']);
-            $planIdNumerico = is_numeric($planIdRaw) ? (int) $planIdRaw : null;
-
-            $planBaseFila = $this->resolverPlanBase($row);
-            $cultivoDesdePlanId = null;
-            if ($planBaseFila === false) {
-                $this->stats['filas_plan_base_invalido']++;
-
-                // Compatibilidad: si plan_id_base no existe como plan, intentar usarlo como cultivo_id.
-                if ($planIdNumerico) {
-                    $cultivoDesdePlanId = Cultivo::query()->find($planIdNumerico);
-                    if ($cultivoDesdePlanId) {
-                        $this->stats['filas_plan_id_usado_como_cultivo_id']++;
-                    }
-                }
-            }
-
-            $planBase = $planBaseFila instanceof planes_cultivo ? $planBaseFila : null;
-
             $cultivoIdRaw = $this->obtenerValor($row, ['cultivo_id', 'id_cultivo']);
-            if ($cultivoIdRaw === null || trim((string) $cultivoIdRaw) === '') {
-                $this->registrarError($fila, 'La columna cultivo_id es obligatoria.');
-                continue;
-            }
+            $cultivoCodigoRaw = $this->obtenerValor($row, ['cultivo_codigo', 'codigo_cultivo', 'codigo']);
+            $cultivoNombreRaw = $this->obtenerValor($row, ['cultivo_nombre', 'cultivo', 'nombre_cultivo', 'nombre']);
+            $cultivo = $this->resolverCultivoPrincipal($cultivoIdRaw, $cultivoCodigoRaw, $cultivoNombreRaw);
 
-            $cultivo = $planBase
-                ? Cultivo::query()->find($planBase->cultivo_id)
-                : ($cultivoDesdePlanId ?: Cultivo::query()->find((int) $cultivoIdRaw));
             if (!$cultivo) {
-                $codigoRaw = $this->obtenerValor($row, ['cultivo_codigo', 'codigo_cultivo', 'codigo']);
-                $nombreRaw = $this->obtenerValor($row, ['cultivo_nombre', 'cultivo', 'nombre_cultivo', 'nombre']);
-
                 $this->registrarError(
                     $fila,
-                    'No existe cultivo para cultivo_id=' . ($cultivoIdRaw ?? 'vacio') . ' (codigo=' . ($codigoRaw ?? 'vacio') . ', nombre=' . ($nombreRaw ?? 'vacio') . '). Cree primero el cultivo en el modulo Cultivos y luego vuelva a importar la receta.'
+                    'No existe cultivo para cultivo_id=' . ($cultivoIdRaw ?? 'vacio') . ' (codigo=' . ($cultivoCodigoRaw ?? 'vacio') . ', nombre=' . ($cultivoNombreRaw ?? 'vacio') . '). Cree primero el cultivo en el modulo Cultivos y luego vuelva a importar la receta.'
                 );
                 continue;
             }
@@ -102,32 +77,34 @@ class PlanesCultivoImport implements ToCollection, WithHeadingRow, SkipsEmptyRow
             ]);
             $fechaPlan = $this->normalizarFecha($fechaRaw);
             if (!$fechaPlan) {
-                $fechaPlan = $this->obtenerFechaPorDefecto($planBase);
+                $fechaPlan = $this->obtenerFechaPorDefecto();
                 $this->stats['filas_con_fecha_por_defecto']++;
             }
 
-            if (! $planBase && ! $this->filaPerteneceAPlanUnico($cultivo, $fechaPlan, $fila)) {
-                continue;
-            }
-
-            $semana = (int) $this->toFloat($row['semana'] ?? null);
-            if ($semana < 1 || $semana > 52) {
-                $this->registrarError($fila, 'La semana debe estar entre 1 y 52.');
+            $semana = $this->resolverSemanaFila($row);
+            if ($semana < 0 || $semana > 52) {
+                $this->registrarError($fila, 'La semana debe estar entre 0 y 52.');
                 continue;
             }
 
             $categoria = $this->limpiarTexto($row['categoria'] ?? null);
             $descripcion = $this->limpiarTexto($row['descripcion'] ?? null);
             $unidad = $this->limpiarTexto($row['unidad_medida'] ?? null);
-            $cantidad = round($this->toFloat($row['cantidad_estimada'] ?? null), 2);
-            $costo = round($this->toFloat($row['costo_unitario'] ?? null), 2);
+            $cantidadPorHectarea = round($this->toFloat($this->obtenerValor($row, ['cantidad_estimada', 'cantidad_por_ha', 'cantidad_ha', 'cantidad_por_hectarea'])), 3);
+            $costo = round($this->toFloat($row['costo_unitario'] ?? null), 3);
+            $hectareasCultivo = round($this->toFloat($cultivo->hectareas ?? null), 3);
 
             if (!$categoria || !$descripcion || !$unidad) {
                 $this->registrarError($fila, 'categoria, descripcion y unidad_medida son obligatorias.');
                 continue;
             }
 
-            if ($cantidad <= 0) {
+            if ($hectareasCultivo <= 0) {
+                $this->registrarError($fila, 'El cultivo seleccionado no tiene hectareas validas para multiplicar la receta base de 1 HA.');
+                continue;
+            }
+
+            if ($cantidadPorHectarea <= 0) {
                 $this->stats['filas_omitidas']++;
                 continue;
             }
@@ -137,19 +114,22 @@ class PlanesCultivoImport implements ToCollection, WithHeadingRow, SkipsEmptyRow
                 continue;
             }
 
+            $cantidad = round($cantidadPorHectarea * $hectareasCultivo, 3);
+            $this->stats['filas_multiplicadas_por_hectareas']++;
+
             $cosechaEstimada = (float) ($cultivo->cosecha_estimada ?? 0);
-            $planIdGrupo = $planBase?->id;
-            $clave = $planIdGrupo ? ('PLAN_BASE|' . $planIdGrupo) : 'IMPORT_UNICA';
+            $clave = 'IMPORT|' . $cultivo->id;
 
             if (!isset($grupos[$clave])) {
                 $grupos[$clave] = [
                     'clave' => $clave,
-                    'plan_id_base' => $planIdGrupo,
                     'cultivo' => $cultivo,
                     'fecha_plan' => $fechaPlan,
                     'cosecha_estimada' => $cosechaEstimada,
                     'detalles' => [],
                 ];
+            } elseif ($fechaPlan < $grupos[$clave]['fecha_plan']) {
+                $grupos[$clave]['fecha_plan'] = $fechaPlan;
             }
 
             $grupos[$clave]['detalles'][] = [
@@ -159,7 +139,7 @@ class PlanesCultivoImport implements ToCollection, WithHeadingRow, SkipsEmptyRow
                 'cantidad_estimada' => $cantidad,
                 'unidad_medida' => $unidad,
                 'costo_unitario' => $costo,
-                'subtotal' => round($cantidad * $costo, 2),
+                'subtotal' => round($cantidad * $costo, 3),
             ];
         }
 
@@ -171,14 +151,8 @@ class PlanesCultivoImport implements ToCollection, WithHeadingRow, SkipsEmptyRow
         DB::transaction(function () use ($grupos) {
             foreach ($grupos as $grupo) {
                 $cultivo = $grupo['cultivo'];
-                $planIdBaseGrupo = $grupo['plan_id_base'] ?? null;
                 $claveGrupo = $grupo['clave'] ?? null;
-
-                if ($planIdBaseGrupo) {
-                    $plan = planes_cultivo::query()->lockForUpdate()->findOrFail($planIdBaseGrupo);
-                } else {
-                    $plan = $this->resolverPlanImportado($claveGrupo, $cultivo, $grupo);
-                }
+                $plan = $this->resolverPlanImportado($claveGrupo, $cultivo, $grupo);
 
                 $total = 0;
                 foreach ($grupo['detalles'] as $detalle) {
@@ -191,22 +165,13 @@ class PlanesCultivoImport implements ToCollection, WithHeadingRow, SkipsEmptyRow
                     $this->stats['detalles_creados']++;
                 }
 
-                if ($planIdBaseGrupo) {
-                    $plan->update($this->filterPersistedColumns('planes_cultivos', [
-                        'semana' => min($this->resolverSemanaCabecera($grupo['detalles']), (int) ($plan->semana ?: 52)),
-                        'total_presupuesto' => ((float) $plan->total_presupuesto) + $total,
-                        'updated_by' => $this->userId,
-                    ]));
-                    $this->stats['planes_actualizados']++;
-                } else {
-                    $plan->update($this->filterPersistedColumns('planes_cultivos', [
-                        'semana' => min($this->resolverSemanaCabecera($grupo['detalles']), (int) ($plan->semana ?: 52)),
-                        'total_presupuesto' => ((float) $plan->total_presupuesto) + $total,
-                        'updated_by' => $this->userId,
-                    ]));
-                    if ($claveGrupo !== null) {
-                        $this->planesImportadosCache[$claveGrupo] = $plan->id;
-                    }
+                $plan->update($this->filterPersistedColumns('planes_cultivos', [
+                    'semana' => min($this->resolverSemanaCabecera($grupo['detalles']), (int) ($plan->semana ?: 52)),
+                    'total_presupuesto' => ((float) $plan->total_presupuesto) + $total,
+                    'updated_by' => $this->userId,
+                ]));
+                if ($claveGrupo !== null) {
+                    $this->planesImportadosCache[$claveGrupo] = $plan->id;
                 }
             }
         });
@@ -228,11 +193,9 @@ class PlanesCultivoImport implements ToCollection, WithHeadingRow, SkipsEmptyRow
             'Filas procesadas: ' . $this->stats['filas_procesadas'],
             'Filas omitidas (cantidad <= 0): ' . $this->stats['filas_omitidas'],
             'Filas con error: ' . $this->stats['filas_error'],
-            'Filas con plan_id_base invalido (se ignoro y continuo): ' . $this->stats['filas_plan_base_invalido'],
-            'Filas donde plan_id_base se uso como cultivo_id: ' . $this->stats['filas_plan_id_usado_como_cultivo_id'],
             'Filas con fecha por defecto: ' . $this->stats['filas_con_fecha_por_defecto'],
+            'Filas multiplicadas por hectareas del cultivo (base 1 HA): ' . $this->stats['filas_multiplicadas_por_hectareas'],
             'Planes creados: ' . $this->stats['planes_creados'],
-            'Planes actualizados: ' . $this->stats['planes_actualizados'],
             'Detalles creados: ' . $this->stats['detalles_creados'],
         ];
     }
@@ -304,6 +267,14 @@ class PlanesCultivoImport implements ToCollection, WithHeadingRow, SkipsEmptyRow
             return null;
         }
 
+        foreach (['d/m/Y', 'j/n/Y', 'd-m-Y', 'j-n-Y'] as $formato) {
+            try {
+                return Carbon::createFromFormat($formato, $texto)->format('Y-m-d');
+            } catch (\Throwable $e) {
+                continue;
+            }
+        }
+
         try {
             return Carbon::parse($texto)->format('Y-m-d');
         } catch (\Throwable $e) {
@@ -317,45 +288,95 @@ class PlanesCultivoImport implements ToCollection, WithHeadingRow, SkipsEmptyRow
         $this->errores[] = 'Fila ' . $fila . ': ' . $mensaje;
     }
 
-    protected function obtenerFechaPorDefecto(?planes_cultivo $planBase = null): string
+    protected function obtenerFechaPorDefecto(): string
     {
-        if ($planBase && !empty($planBase->fecha_plan)) {
-            return (string) $planBase->fecha_plan;
-        }
-
-        if ($this->planIdBase) {
-            $plan = planes_cultivo::query()->find($this->planIdBase);
-            if ($plan && !empty($plan->fecha_plan)) {
-                return (string) $plan->fecha_plan;
-            }
-        }
-
         return Carbon::today()->format('Y-m-d');
     }
 
-    protected function resolverPlanBase(Collection $row)
+    protected function resolverCultivo(mixed $cultivoId, mixed $cultivoCodigo, mixed $cultivoNombre): ?Cultivo
     {
-        $planIdRaw = $this->obtenerValor($row, ['plan_id_base', 'plan_id', 'id_plan']);
-        if ($planIdRaw !== null && trim((string) $planIdRaw) !== '') {
-            $plan = $this->buscarPlanBase((int) $planIdRaw);
-            return $plan ?: false;
+        if ($cultivoId !== null && trim((string) $cultivoId) !== '' && is_numeric($cultivoId)) {
+            $cultivoId = (int) $cultivoId;
+            if (! array_key_exists($cultivoId, $this->cultivosPorId)) {
+                $this->cultivosPorId[$cultivoId] = Cultivo::query()->find($cultivoId);
+            }
+
+            $cultivo = $this->cultivosPorId[$cultivoId];
+            if ($cultivo) {
+                return $cultivo;
+            }
         }
 
-        if ($this->planIdBase) {
-            $plan = $this->buscarPlanBase($this->planIdBase);
-            return $plan ?: false;
+        $codigo = $this->limpiarTexto($cultivoCodigo);
+        if ($codigo !== '') {
+            if (! array_key_exists($codigo, $this->cultivosPorCodigo)) {
+                $this->cultivosPorCodigo[$codigo] = Cultivo::query()->where('codigo', $codigo)->first();
+            }
+
+            $cultivo = $this->cultivosPorCodigo[$codigo];
+            if ($cultivo) {
+                return $cultivo;
+            }
+        }
+
+        $nombre = $this->limpiarTexto($cultivoNombre);
+        if ($nombre !== '') {
+            if (! array_key_exists($nombre, $this->cultivosPorNombre)) {
+                $this->cultivosPorNombre[$nombre] = Cultivo::query()->where('nombre', $nombre)->first();
+            }
+
+            return $this->cultivosPorNombre[$nombre];
         }
 
         return null;
     }
 
-    protected function buscarPlanBase(int $planId): ?planes_cultivo
+    protected function buscarCoincidenciasCultivo(mixed $cultivoId, mixed $cultivoCodigo, mixed $cultivoNombre): array
     {
-        if ($this->planesCache === null) {
-            $this->planesCache = planes_cultivo::query()->select(['id', 'cultivo_id', 'fecha_plan'])->get();
+        return [
+            'cultivo_id' => $this->resolverCultivo($cultivoId, null, null),
+            'cultivo_codigo' => $this->resolverCultivo(null, $cultivoCodigo, null),
+            'cultivo_nombre' => $this->resolverCultivo(null, null, $cultivoNombre),
+        ];
+    }
+
+    protected function resolverCultivoPrincipal(mixed $cultivoId, mixed $cultivoCodigo, mixed $cultivoNombre): ?Cultivo
+    {
+        $cultivoPorId = $this->resolverCultivo($cultivoId, null, null);
+        if ($cultivoPorId instanceof Cultivo) {
+            return $cultivoPorId;
         }
 
-        return $this->planesCache->first(fn (planes_cultivo $plan) => (int) $plan->id === $planId);
+        $coincidenciasCultivo = $this->buscarCoincidenciasCultivo(null, $cultivoCodigo, $cultivoNombre);
+
+        if ($this->hayConflictoEntreCoincidenciasCultivo($coincidenciasCultivo)) {
+            return null;
+        }
+
+        return $this->resolverCultivoDesdeCoincidencias($coincidenciasCultivo);
+    }
+
+    protected function hayConflictoEntreCoincidenciasCultivo(array $coincidenciasCultivo): bool
+    {
+        $ids = collect($coincidenciasCultivo)
+            ->filter(fn ($cultivo) => $cultivo instanceof Cultivo)
+            ->map(fn (Cultivo $cultivo) => (int) $cultivo->id)
+            ->unique()
+            ->values();
+
+        return $ids->count() > 1;
+    }
+
+    protected function resolverCultivoDesdeCoincidencias(array $coincidenciasCultivo): ?Cultivo
+    {
+        foreach (['cultivo_id', 'cultivo_codigo', 'cultivo_nombre'] as $origen) {
+            $cultivo = $coincidenciasCultivo[$origen] ?? null;
+            if ($cultivo instanceof Cultivo) {
+                return $cultivo;
+            }
+        }
+
+        return null;
     }
 
     protected function resolverPlanImportado(?string $claveGrupo, Cultivo $cultivo, array $grupo): planes_cultivo
@@ -384,37 +405,13 @@ class PlanesCultivoImport implements ToCollection, WithHeadingRow, SkipsEmptyRow
         return $plan;
     }
 
-    protected function filaPerteneceAPlanUnico(Cultivo $cultivo, string $fechaPlan, int $fila): bool
-    {
-        if ($this->planImportacionUnica === null) {
-            $this->planImportacionUnica = [
-                'cultivo_id' => (int) $cultivo->id,
-                'fecha_plan' => $fechaPlan,
-            ];
-
-            return true;
-        }
-
-        if ((int) $this->planImportacionUnica['cultivo_id'] !== (int) $cultivo->id) {
-            $this->registrarError($fila, 'La carga masiva solo puede crear un plan por importacion. Todas las filas deben pertenecer al mismo cultivo_id.');
-
-            return false;
-        }
-
-        if ((string) $this->planImportacionUnica['fecha_plan'] !== $fechaPlan) {
-            $this->registrarError($fila, 'La carga masiva solo puede crear un plan por importacion. Todas las filas deben usar la misma fecha_plan.');
-
-            return false;
-        }
-
-        return true;
-    }
-
     protected function filterPersistedColumns(string $table, array $payload): array
     {
-        $availableColumns = array_flip(Schema::getColumnListing($table));
+        if (! isset($this->columnasPorTabla[$table])) {
+            $this->columnasPorTabla[$table] = array_flip(Schema::getColumnListing($table));
+        }
 
-        return array_intersect_key($payload, $availableColumns);
+        return array_intersect_key($payload, $this->columnasPorTabla[$table]);
     }
 
     protected function resolverSemanaCabecera(array $detalles): int
@@ -422,9 +419,54 @@ class PlanesCultivoImport implements ToCollection, WithHeadingRow, SkipsEmptyRow
         $semanas = collect($detalles)
             ->pluck('semana')
             ->map(fn ($semana) => (int) $semana)
-            ->filter(fn ($semana) => $semana >= 1 && $semana <= 52)
+            ->filter(fn ($semana) => $semana >= 0 && $semana <= 52)
             ->values();
 
         return (int) ($semanas->min() ?: 1);
     }
+
+    protected function resolverSemanaFila(Collection $row): int
+    {
+        $semanaRaw = $this->obtenerValor($row, ['semana', 'semana_cultivo', 'numero_semana', 'semana_plan']);
+        $semana = $this->extraerNumeroSemana($semanaRaw);
+
+        if ($semana >= 0 && $semana <= 52) {
+            return $semana;
+        }
+
+        $fechaSemanaRaw = $this->obtenerValor($row, ['fecha_semana', 'semana_fecha']);
+        $fechaSemana = $this->normalizarFecha($fechaSemanaRaw);
+        if ($fechaSemana) {
+            try {
+                return max(1, min(52, (int) Carbon::parse($fechaSemana)->isoWeek()));
+            } catch (\Throwable $error) {
+                return 0;
+            }
+        }
+
+        return 0;
+    }
+
+    protected function extraerNumeroSemana(mixed $value): int
+    {
+        if ($value === null || $value === '') {
+            return 0;
+        }
+
+        if (is_numeric($value)) {
+            return (int) $this->toFloat($value);
+        }
+
+        $texto = trim((string) $value);
+        if ($texto === '') {
+            return 0;
+        }
+
+        if (preg_match('/(\d{1,2})/', $texto, $match) === 1) {
+            return (int) $match[1];
+        }
+
+        return 0;
+    }
+
 }

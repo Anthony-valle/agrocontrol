@@ -27,6 +27,9 @@ class planes_detalles extends Model
     ];
 
     protected $casts = [
+        'cantidad_estimada' => 'decimal:3',
+        'costo_unitario' => 'decimal:3',
+        'subtotal' => 'decimal:3',
         'deleted_at' => 'datetime',
     ];
 

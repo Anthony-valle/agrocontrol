@@ -83,8 +83,9 @@ class AppServiceProvider extends ServiceProvider
 
         $user = Auth::user();
         $isSuperUser = $user && method_exists($user, 'isSuperUser') && $user->isSuperUser();
+        $isCompra = $user && method_exists($user, 'hasRole') && $user->hasRole('compra');
 
-        if (!$isSuperUser) {
+        if (!$isSuperUser && !$isCompra) {
             return collect();
         }
 

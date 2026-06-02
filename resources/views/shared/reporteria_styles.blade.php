@@ -100,14 +100,44 @@
     }
 
     .reporteria-shell .reporteria-table-responsive {
-        border: 1px solid rgba(15, 23, 42, 0.08);
-        border-radius: 1rem;
+        border: 1px solid rgba(15, 90, 67, 0.14);
+        border-radius: 0 0 1rem 1rem;
         overflow: hidden;
         background: #fff;
     }
 
     .reporteria-shell .reporteria-table-responsive table {
         margin-bottom: 0;
+    }
+
+    .reporteria-shell .reporteria-table-responsive .table {
+        --bs-table-bg: transparent;
+    }
+
+    .reporteria-shell .reporteria-table-responsive .table thead th {
+        background: #17684b;
+        color: #fff;
+        border: 0;
+        white-space: nowrap;
+        padding: 0.68rem 0.7rem;
+        vertical-align: middle;
+        font-weight: 700;
+    }
+
+    .reporteria-shell .reporteria-table-responsive .table thead th:first-child {
+        border-top-left-radius: 0.9rem;
+    }
+
+    .reporteria-shell .reporteria-table-responsive .table thead th:last-child {
+        border-top-right-radius: 0.9rem;
+    }
+
+    .reporteria-shell .reporteria-table-responsive .table tbody td,
+    .reporteria-shell .reporteria-table-responsive .table tfoot td,
+    .reporteria-shell .reporteria-table-responsive .table tfoot th {
+        padding: 0.62rem 0.7rem;
+        border-color: #d7e3dc;
+        vertical-align: middle;
     }
 
     @media (max-width: 767.98px) {

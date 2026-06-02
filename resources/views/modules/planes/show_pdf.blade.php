@@ -43,17 +43,17 @@
                     <td>{{ $detalle->semana }}</td>
                     <td>{{ $detalle->categoria }}</td>
                     <td>{{ $detalle->descripcion }}</td>
-                    <td>{{ agro_number((float) $detalle->cantidad_estimada, 2) }}</td>
+                    <td>{{ agro_number((float) $detalle->cantidad_estimada, 3) }}</td>
                     <td>{{ $detalle->unidad_medida }}</td>
-                    <td class="right">{{ agro_number((float) $detalle->costo_unitario, 2) }}</td>
-                    <td class="right">{{ agro_number($subtotal, 2) }}</td>
+                    <td class="right">{{ agro_number((float) $detalle->costo_unitario, 3) }}</td>
+                    <td class="right">{{ agro_number($subtotal, 3) }}</td>
                 </tr>
             @endforeach
         </tbody>
         <tfoot>
             <tr>
                 <th colspan="6" class="right">Total presupuesto</th>
-                <th class="right">{{ agro_number($total, 2) }}</th>
+                <th class="right">{{ agro_number($total, 3) }}</th>
             </tr>
         </tfoot>
     </table>

@@ -53,7 +53,7 @@
 
                     <div class="col-md-3">
                         <label class="fw-bold">Cosecha Estimada</label>
-                        <div>{{ agro_number((float) $cosechaEstimadaMostrada,2) }}</div>
+                        <div>{{ agro_number((float) $cosechaEstimadaMostrada,3) }}</div>
                     </div>
 
                     <div class="col-md-3">
@@ -82,26 +82,26 @@
                     <div class="col-md-4">
                         <div class="border rounded bg-light h-100 p-3">
                             <div class="text-muted small">Cantidad total filtrada</div>
-                            <div class="fs-4 fw-bold" id="resumenCantidadFiltrada">0.00</div>
+                            <div class="fs-4 fw-bold" id="resumenCantidadFiltrada">0.000</div>
                         </div>
                     </div>
                     <div class="col-md-4">
                         <div class="border rounded bg-light h-100 p-3">
                             <div class="text-muted small">Total presupuesto filtrado</div>
-                            <div class="fs-4 fw-bold text-success" id="resumenPresupuestoFiltrado">0.00 L</div>
+                            <div class="fs-4 fw-bold text-success" id="resumenPresupuestoFiltrado">0.000 L</div>
                         </div>
                     </div>
                 </div>
 
                 <div class="d-flex flex-wrap align-items-center mb-3 p-2 bg-white rounded shadow-sm gap-2 border">
-                    <div class="d-flex align-items-center gap-1 border-end pe-2">
-                        <select id="perPageActividades" class="form-select form-select-sm" style="width: 70px;">
+                    <div class="d-flex align-items-center gap-1 border-end pe-2 agro-toolbar-records">
+                        <select id="perPageActividades" class="form-select form-select-sm agro-toolbar-select" style="width: 70px;">
                             <option value="5">5</option>
                             <option value="10" selected>10</option>
                             <option value="20">20</option>
                             <option value="9999">Todas</option>
                         </select>
-                        <small class="text-muted" style="font-size: 0.75rem;">Registros</small>
+                        <small class="text-muted text-nowrap" style="font-size: 0.75rem;">Registros</small>
                     </div>
 
                     <div class="input-group input-group-sm" style="width: 220px;">
@@ -150,7 +150,7 @@
 
                             @foreach($detallesOrdenados as $detalle)
                                 @php
-                                    $subtotal = $detalle->cantidad_estimada * $detalle->costo_unitario;
+                                    $subtotal = (float) ($detalle->subtotal ?? ($detalle->cantidad_estimada * $detalle->costo_unitario));
                                     $total += $subtotal;
                                     $actividad = $formatearActividad($detalle->categoria, $detalle->descripcion);
                                 @endphp
@@ -158,10 +158,10 @@
                                     <td>Semana {{ $detalle->semana }}</td>
                                     <td>{{ $detalle->categoria }}</td>
                                     <td>{{ $actividad }}</td>
-                                    <td>{{ $detalle->cantidad_estimada }}</td>
+                                    <td>{{ agro_number((float) $detalle->cantidad_estimada,3) }}</td>
                                     <td>{{ $detalle->unidad_medida }}</td>
-                                    <td>{{ agro_number($detalle->costo_unitario,2) }} L</td>
-                                    <td class="fw-bold text-success">{{ agro_number($subtotal,2) }} L</td>
+                                    <td>{{ agro_number((float) $detalle->costo_unitario,3) }} L</td>
+                                    <td class="fw-bold text-success">{{ agro_number($subtotal,3) }} L</td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -169,8 +169,8 @@
                         <tfoot class="table-light">
                             <tr>
                                 <td colspan="5" class="text-end fw-bold">RESUMEN FILTRADO</td>
-                                <td class="fw-bold">Cant.: <span id="footerCantidadFiltrada">0.00</span></td>
-                                <td class="fw-bold text-success"><span id="footerPresupuestoFiltrado">0.00 L</span></td>
+                                <td class="fw-bold">Cant.: <span id="footerCantidadFiltrada">0.000</span></td>
+                                <td class="fw-bold text-success"><span id="footerPresupuestoFiltrado">0.000 L</span></td>
                             </tr>
                         </tfoot>
 
@@ -278,20 +278,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         document.getElementById('resumenActividadesVisibles').textContent = totalActividades.toLocaleString('en-US');
         document.getElementById('resumenCantidadFiltrada').textContent = totalCantidad.toLocaleString('en-US', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
+            minimumFractionDigits: 3,
+            maximumFractionDigits: 3,
         });
         document.getElementById('resumenPresupuestoFiltrado').textContent = totalPresupuesto.toLocaleString('en-US', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
+            minimumFractionDigits: 3,
+            maximumFractionDigits: 3,
         }) + ' L';
         document.getElementById('footerCantidadFiltrada').textContent = totalCantidad.toLocaleString('en-US', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
+            minimumFractionDigits: 3,
+            maximumFractionDigits: 3,
         });
         document.getElementById('footerPresupuestoFiltrado').textContent = totalPresupuesto.toLocaleString('en-US', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
+            minimumFractionDigits: 3,
+            maximumFractionDigits: 3,
         }) + ' L';
     }
 

@@ -21,6 +21,7 @@ use App\Http\Controllers\PreparacionSueloController;
 use App\Http\Middleware\AuditUserAction;
 use App\Http\Controllers\ReporteController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\SolicitudCompraController;
 use App\Http\Controllers\SucursaleController;
 use App\Http\Controllers\SupportController;
 use App\Http\Controllers\UserController;
@@ -68,21 +69,44 @@ Route::middleware(['auth', AuditUserAction::class])->group(function () {
     // Historial de notificaciones
     Route::get('/notificaciones', [NotificacionesController::class, 'index'])->name('notificaciones.index');
 
+    Route::prefix('compras')->name('compras.')->group(function () {
+        Route::get('/solicitudes', [SolicitudCompraController::class, 'review'])->name('solicitudes.index');
+        Route::get('/solicitudes/nueva', [SolicitudCompraController::class, 'index'])->name('solicitudes.create');
+        Route::get('/solicitudes/revision', [SolicitudCompraController::class, 'review'])->name('solicitudes.review');
+        Route::post('/solicitudes', [SolicitudCompraController::class, 'store'])->name('solicitudes.store');
+        Route::get('/solicitudes/{solicitud}', [SolicitudCompraController::class, 'show'])->name('solicitudes.show');
+        Route::get('/solicitudes/{solicitud}/pdf', [SolicitudCompraController::class, 'downloadPdf'])->name('solicitudes.pdf');
+        Route::get('/solicitudes/{solicitud}/orden-compra/nueva', [SolicitudCompraController::class, 'createOrderForm'])->name('solicitudes.order.create');
+        Route::post('/solicitudes/{solicitud}/orden-compra', [SolicitudCompraController::class, 'storeOrder'])->name('solicitudes.order.store');
+        Route::patch('/solicitudes/{solicitud}/aprobar', [SolicitudCompraController::class, 'approve'])->name('solicitudes.approve');
+        Route::patch('/solicitudes/{solicitud}/rechazar', [SolicitudCompraController::class, 'reject'])->name('solicitudes.reject');
+        Route::patch('/solicitudes/{solicitud}/proceso', [SolicitudCompraController::class, 'markInProgress'])->name('solicitudes.progress');
+        Route::get('/ordenes/validacion', [SolicitudCompraController::class, 'validationIndex'])->name('ordenes.validation.index');
+        Route::get('/ordenes/{orden}/validacion', [SolicitudCompraController::class, 'validationForm'])->name('ordenes.validation.show');
+        Route::get('/ordenes/reporte', [SolicitudCompraController::class, 'orderReport'])->name('ordenes.report');
+        Route::get('/ordenes/{orden}', [SolicitudCompraController::class, 'showOrder'])->name('ordenes.show');
+        Route::post('/ordenes/{orden}/recepcion', [SolicitudCompraController::class, 'receiveOrder'])->name('ordenes.receive');
+        Route::patch('/ordenes/{orden}/aprobar-diferencias', [SolicitudCompraController::class, 'approveOrderDifferences'])->name('ordenes.approve-differences');
+    });
+
     // Dashboard
     Route::get('/home', [Dashboard::class, 'index'])->name('home');
 
     // EMPRESAS Y SUCURSALES
     Route::resource('empresas', EmpresaController::class)
         ->except(['show'])
+        ->middleware('module.access:empresas')
         ->middlewareFor(['destroy'], 'sensitive.actions');
     Route::resource('sucursal', SucursaleController::class)
         ->except(['show'])
+        ->middleware('module.access:sucursales')
         ->middlewareFor(['destroy'], 'sensitive.actions');
 
     // USUARIOS
     Route::resource('usuarios', UserController::class)
         ->except(['show'])
         ->parameters(['usuarios' => 'user'])
+        ->middleware('module.access:usuarios')
         ->middlewareFor(['destroy'], 'sensitive.actions');
     Route::post('usuarios/{user}/reset-password', [UserController::class, 'resetPassword'])
         ->middleware('sensitive.actions')
@@ -94,50 +118,91 @@ Route::middleware(['auth', AuditUserAction::class])->group(function () {
     // MÓDULOS AGRÍCOLAS
     Route::resource('categorias', CategoriasController::class)
         ->except(['show'])
+        ->middleware('module.access:insumos')
         ->middlewareFor(['destroy'], 'sensitive.actions');
     Route::resource('cultivo', CultivoController::class)
+        ->middleware('module.access:cultivos')
         ->middlewareFor(['destroy'], 'sensitive.actions');
     Route::patch('/cultivo/{cultivo}/cerrar', [CultivoController::class, 'cerrar'])
+        ->middleware('module.access:cultivos')
         ->middleware('sensitive.actions')
         ->name('cultivo.cerrar');
     Route::patch('/cultivo/{cultivo}/reactivar', [CultivoController::class, 'reactivar'])
+        ->middleware('module.access:cultivos')
         ->middleware('sensitive.actions')
         ->name('cultivo.reactivar');
+    Route::post('/cultivo/importar', [CultivoController::class, 'importar'])
+        ->middleware('module.access:cultivos')
+        ->middleware('sensitive.actions')
+        ->name('cultivo.importar');
+    Route::get('/cultivo/importar/template', [CultivoController::class, 'descargarPlantillaImportacion'])
+        ->middleware('module.access:cultivos')
+        ->middleware('sensitive.actions')
+        ->name('cultivo.importar.template');
     Route::resource('labores', LaboreController::class)
         ->except(['show'])
+        ->middleware('module.access:labores')
         ->middlewareFor(['destroy'], 'sensitive.actions');
     Route::resource('lotes', LoteController::class)
         ->except(['show'])
+        ->middleware('module.access:lotes')
         ->middlewareFor(['destroy'], 'sensitive.actions');
     Route::resource('planes', PlanesCultivoController::class)
+        ->middleware('module.access:planes')
         ->middlewareFor(['destroy'], 'sensitive.actions');
     Route::get('/planes/{plan}/excel', [PlanesCultivoController::class, 'exportExcel'])->name('planes.export.excel');
     Route::get('/planes/{plan}/pdf', [PlanesCultivoController::class, 'exportPdf'])->name('planes.export.pdf');
     Route::post('/planes/importar', [PlanesCultivoController::class, 'importar'])
+        ->middleware('module.access:planes')
         ->middleware('sensitive.actions')
         ->name('planes.importar');
     Route::get('/planes/importar/template', [PlanesCultivoController::class, 'descargarPlantillaImportacion'])
+        ->middleware('module.access:planes')
         ->middleware('sensitive.actions')
         ->name('planes.importar.template');
     Route::resource('preparacion-suelo', PreparacionSueloController::class)
         ->parameters(['preparacion-suelo' => 'consumo'])
         ->except(['create'])
+        ->middleware('module.access:labores')
         ->middlewareFor(['destroy'], 'sensitive.actions');
     Route::resource('preparacion-suelo-actividades', PreparacionSueloActividadController::class)
         ->parameters(['preparacion-suelo-actividades' => 'actividad'])
         ->except(['show'])
+        ->middleware('module.access:labores')
         ->middlewareFor(['destroy'], 'sensitive.actions');
     Route::post('preparacion-suelo-actividades/{actividad}/restore', [PreparacionSueloActividadController::class, 'restore'])
         ->middleware('sensitive.actions')
         ->name('preparacion-suelo-actividades.restore');
     Route::resource('consumo', ConsumoController::class)
+        ->middleware('module.access:consumo')
         ->middlewareFor(['destroy'], 'sensitive.actions');
+    Route::post('/consumo/importar', [ConsumoController::class, 'importar'])
+        ->middleware('module.access:consumo')
+        ->middleware('sensitive.actions')
+        ->name('consumo.importar');
+    Route::get('/consumo/importar/template', [ConsumoController::class, 'descargarPlantillaImportacion'])
+        ->middleware('module.access:consumo')
+        ->middleware('sensitive.actions')
+        ->name('consumo.importar.template');
     Route::patch('/consumo/{consumo}/finalizar', [ConsumoController::class, 'finalizar'])
+        ->middleware('module.access:consumo')
         ->middleware('sensitive.actions')
         ->name('consumo.finalizar');
-    Route::get('/planes/descripciones/{categoria}', [PlanesCultivoController::class, 'descripciones'])->name('planes.descripciones');
-    Route::get('/api/inventario_bodega/{insumo_id}', [ConsumoController::class, 'getBodegasLotes']);
-    Route::get('/api/cultivo/{cultivo_id}/consumos', [ConsumoController::class, 'getHistorialConsumo']);
+    Route::patch('/consumo/{consumo}/anular', [ConsumoController::class, 'anular'])
+        ->middleware('module.access:consumo')
+        ->middleware('sensitive.actions')
+        ->name('consumo.anular');
+    Route::patch('/consumo/cultivo/{cultivo}/anular-todos', [ConsumoController::class, 'anularPorCultivo'])
+        ->middleware('module.access:consumo')
+        ->middleware('sensitive.actions')
+        ->name('consumo.anular-cultivo');
+    Route::get('/planes/descripciones/{categoria}', [PlanesCultivoController::class, 'descripciones'])
+        ->middleware('module.access:planes')
+        ->name('planes.descripciones');
+    Route::get('/api/inventario_bodega/{insumo_id}', [ConsumoController::class, 'getBodegasLotes'])
+        ->middleware('module.access:consumo');
+    Route::get('/api/cultivo/{cultivo_id}/consumos', [ConsumoController::class, 'getHistorialConsumo'])
+        ->middleware('module.access:consumo');
 
     Route::post('/notificaciones/marcar-leidas', [NotificacionesController::class, 'marcarLeidas'])->name('notificaciones.marcar-leidas');
     Route::post('/alertas/leidas', [Dashboard::class, 'marcarAlertasLeidas'])->name('alertas.leidas');
@@ -146,6 +211,7 @@ Route::middleware(['auth', AuditUserAction::class])->group(function () {
      // Cosechas
     Route::resource('cosecha', CosechaController::class)
         ->except(['show'])
+        ->middleware('module.access:cosecha')
         ->middlewareFor(['destroy'], 'sensitive.actions');
     Route::get('/cosecha/facturadas', [CosechaController::class, 'facturadasIndex'])->name('cosecha.facturadas.index');
     Route::get('/cosecha/{cosecha}/facturas', [CosechaController::class, 'facturas'])->name('cosecha.facturas');
@@ -162,12 +228,19 @@ Route::middleware(['auth', AuditUserAction::class])->group(function () {
     Route::get('/cultivo/unidad/{id}', [CosechaController::class, 'getUnidad']);
     // Insumos
     Route::get('/insumos/importar', [InsumosController::class, 'importar'])
+        ->middleware('module.access:insumos')
         ->middleware('sensitive.actions')
         ->name('insumos.importar');
     Route::post('/insumos/importar', [InsumosController::class, 'importarExcel'])
+        ->middleware('module.access:insumos')
         ->middleware('sensitive.actions')
         ->name('insumos.importar.store');
+    Route::patch('/insumos/{insumo}/estado', [InsumosController::class, 'cambiarEstado'])
+        ->middleware('module.access:insumos')
+        ->middleware('sensitive.actions')
+        ->name('insumos.estado');
     Route::resource('insumos', InsumosController::class)
+        ->middleware('module.access:insumos')
         ->middlewareFor(['destroy'], 'sensitive.actions');
 
     //Moviminetos
@@ -177,52 +250,59 @@ Route::middleware(['auth', AuditUserAction::class])->group(function () {
 
     // Entrada
     Route::get('/entradas', [MovimientoInventarioController::class, 'entradaIndex'])->name('entradas.index');
-    Route::get('/entrada', [MovimientoInventarioController::class, 'entrada'])->name('entrada');
-    Route::post('/entrada', [MovimientoInventarioController::class, 'entradaStore'])->name('entrada.store');
+    Route::get('/entrada', [MovimientoInventarioController::class, 'entrada'])->middleware('module.access:entrada')->name('entrada');
+    Route::post('/entrada', [MovimientoInventarioController::class, 'entradaStore'])->middleware('module.access:entrada')->name('entrada.store');
     Route::get('/entrada/importar', [MovimientoInventarioController::class, 'entradaImportar'])
+        ->middleware('module.access:entrada')
         ->middleware('sensitive.actions')
         ->name('entrada.importar');
     Route::post('/entrada/importar', [MovimientoInventarioController::class, 'entradaImportarStore'])
+        ->middleware('module.access:entrada')
         ->middleware('sensitive.actions')
         ->name('entrada.importar.store');
     Route::get('/entrada/importar/template', [MovimientoInventarioController::class, 'descargarPlantillaEntradaInicial'])
+        ->middleware('module.access:entrada')
         ->middleware('sensitive.actions')
         ->name('entrada.importar.template');
 
 
     // Ajuste
-    Route::get('/ajuste', [MovimientoInventarioController::class, 'ajuste'])->name('ajuste');
-    Route::post('/ajuste', [MovimientoInventarioController::class, 'ajusteStore'])->name('ajuste.store');
+    Route::get('/ajuste', [MovimientoInventarioController::class, 'ajuste'])->middleware('module.access:ajuste')->name('ajuste');
+    Route::post('/ajuste', [MovimientoInventarioController::class, 'ajusteStore'])->middleware('module.access:ajuste')->name('ajuste.store');
 
     // Traslado
-    Route::get('/traslado', [MovimientoInventarioController::class, 'traslado'])->name('traslado');
-    Route::post('/traslado', [MovimientoInventarioController::class, 'trasladoStore'])->name('traslado.store');
+    Route::get('/traslado', [MovimientoInventarioController::class, 'traslado'])->middleware('module.access:traslado')->name('traslado');
+    Route::post('/traslado', [MovimientoInventarioController::class, 'trasladoStore'])->middleware('module.access:traslado')->name('traslado.store');
 
     // Salida
-    Route::get('/salida', [MovimientoInventarioController::class, 'salida'])->name('salida');
-    Route::post('/salida', [MovimientoInventarioController::class, 'salidaStore'])->name('salida.store');
+    Route::get('/salida', [MovimientoInventarioController::class, 'salida'])->middleware('module.access:inventarios')->name('salida');
+    Route::post('/salida', [MovimientoInventarioController::class, 'salidaStore'])->middleware('module.access:inventarios')->name('salida.store');
     });
 
    
     // Obtener unidad
     
     Route::get('reporte/cultivo/{id}', [ReporteController::class, 'reporteFinal'])->name('reporte.cultivo.final');
+    Route::get('reporte/cultivo/{cultivo_id}/plan-real-semanal', [ReporteController::class, 'reportePlanRealSemanal'])->name('reporte.cultivo.plan-real-semanal');
+    Route::get('reporte/cultivo/{cultivo_id}/plan-real-semanal/excel', [ReporteController::class, 'reportePlanRealSemanalExcel'])->name('reporte.cultivo.plan-real-semanal.excel');
     Route::get('reporte/cultivo/{id}/categoria-detalle', [ReporteController::class, 'categoriaDetalle'])->name('reporte.cultivo.categoria-detalle');
     Route::get('reporte/cultivo/{cultivo_id}/historial', [ReporteController::class, 'historialConsumo'])->name('reporte.cultivo.historial');
     Route::get('reporte/cultivo/{cultivo_id}/historial/consumo/{consumo_id}', [ReporteController::class, 'historialConsumoDetalle'])->name('reporte.cultivo.historial.detalle');
     Route::get('reporte/cultivo/{cultivo_id}/historial/excel', [ReporteController::class, 'historialConsumoExcel'])->name('reporte.cultivo.historial.excel');
     Route::get('reporte/cultivo/{cultivo_id}/historial/pdf', [ReporteController::class, 'historialConsumoPdf'])->name('reporte.cultivo.historial.pdf');
     // INVENTARIOS
-    Route::resource('inventarios', InventarioController::class)->only(['index']);
-    Route::get('inventarios/{id}/detalle', [InventarioController::class, 'detalle'])->name('inventarios.detalle');
+    Route::resource('inventarios', InventarioController::class)->only(['index'])->middleware('module.access:inventarios');
+    Route::get('inventarios/{id}/detalle', [InventarioController::class, 'detalle'])->middleware('module.access:inventarios')->name('inventarios.detalle');
 
     // BODEGAS
     Route::resource('bodegas', BodegaController::class)
         ->except(['show'])
+        ->middleware('module.access:bodegas')
         ->middlewareFor(['destroy'], 'sensitive.actions');
 
     // ROLES
     Route::resource('rol', RoleController::class)
+        ->middleware('module.access:roles')
         ->except(['show'])
         ->middlewareFor(['destroy'], 'sensitive.actions');
 
@@ -239,8 +319,12 @@ Route::middleware(['auth', AuditUserAction::class])->group(function () {
     Route::get('/reporteria/cultivos', [\App\Http\Controllers\Reporteria\CultivosReportController::class, 'index'])->name('reporteria.cultivos');
     Route::get('/reporteria/cultivos/excel', [\App\Http\Controllers\Reporteria\CultivosReportController::class, 'exportExcel'])->name('reporteria.cultivos.excel');
     Route::get('/reporteria/cultivos/pdf', [\App\Http\Controllers\Reporteria\CultivosReportController::class, 'exportPdf'])->name('reporteria.cultivos.pdf');
+    Route::get('/reporteria/cultivos/consumos-general', [\App\Http\Controllers\Reporteria\CultivosReportController::class, 'consumosGeneral'])->name('reporteria.cultivos.consumos-general');
+    Route::get('/reporteria/cultivos/consumos-general/{cultivo}', [\App\Http\Controllers\Reporteria\CultivosReportController::class, 'consumosGeneralDetalle'])->whereNumber('cultivo')->name('reporteria.cultivos.consumos-general.detalle');
+    Route::get('/reporteria/cultivos/consumos-general/excel', [\App\Http\Controllers\Reporteria\CultivosReportController::class, 'exportConsumosGeneralExcel'])->name('reporteria.cultivos.consumos-general.excel');
     Route::get('/reporteria/cultivos/{cultivo}/consumos-fecha', [\App\Http\Controllers\Reporteria\CultivosReportController::class, 'consumosPorFecha'])->name('reporteria.cultivos.consumos-fecha');
     Route::get('/reporteria/cultivos/{cultivo}/consumos-categoria', [\App\Http\Controllers\Reporteria\CultivosReportController::class, 'consumosPorCategoria'])->name('reporteria.cultivos.consumos-categoria');
+    Route::get('/reporteria/cultivos/{cultivo}/consumos-categoria/pagina', [\App\Http\Controllers\Reporteria\CultivosReportController::class, 'consumosPorCategoriaPagina'])->name('reporteria.cultivos.consumos-categoria.pagina');
     Route::get('/reporteria/cultivos/{cultivo}/consumos-categoria/excel', [\App\Http\Controllers\Reporteria\CultivosReportController::class, 'exportConsumosCategoriaExcel'])->name('reporteria.cultivos.consumos-categoria.excel');
     Route::get('/reporteria/cultivos/{cultivo}/consumos-categoria/pdf', [\App\Http\Controllers\Reporteria\CultivosReportController::class, 'exportConsumosCategoriaPdf'])->name('reporteria.cultivos.consumos-categoria.pdf');
     Route::get('/reporteria/cultivos/{cultivo}', [\App\Http\Controllers\Reporteria\CultivosReportController::class, 'show'])->name('reporteria.cultivos.show');

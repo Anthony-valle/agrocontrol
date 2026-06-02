@@ -65,6 +65,19 @@
             white-space: nowrap;
         }
 
+        .cultivo-report-topbar {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .cultivo-report-topbar .btn {
+            max-width: 100%;
+            white-space: nowrap;
+        }
+
         .categoria-comparison-button {
             display: inline-block;
             border: 0;
@@ -106,6 +119,18 @@
                 display: none !important;
             }
         }
+
+        @media (max-width: 767.98px) {
+            .cultivo-report-topbar {
+                justify-content: stretch;
+            }
+
+            .cultivo-report-topbar .btn {
+                width: 100%;
+                margin-right: 0 !important;
+                white-space: normal;
+            }
+        }
     </style>
     <div class="pagetitle">
         <h1>Reporte de Cultivo: {{ $cultivo->nombre }}</h1>
@@ -120,14 +145,18 @@
 
     <section class="section">
         <div class="row mb-3">
-            <div class="col-md-8"></div>
-            <div class="col-md-4 text-md-end">
+            <div class="col-12">
+                <div class="cultivo-report-topbar">
+                <a href="{{ route('reporte.cultivo.plan-real-semanal', $cultivo->id) }}" class="btn btn-outline-dark btn-sm me-2">
+                    <i class="bi bi-list-check"></i> Comparacion semanal de insumos
+                </a>
                 <button type="button" class="btn btn-success btn-sm me-2" onclick="window.print()">
                     <i class="bi bi-printer"></i> Imprimir / PDF
                 </button>
                 <button type="button" class="btn btn-primary btn-sm" onclick="downloadReportCsv()">
                     <i class="bi bi-download"></i> Descargar CSV
                 </button>
+                </div>
             </div>
         </div>
 
@@ -444,7 +473,7 @@
 
             function renderPagination() {
                 list.innerHTML = '';
-                const maxVisiblePages = 7;
+                const maxVisiblePages = 5;
 
                 function addItem(label, page, disabled, active) {
                     const li = document.createElement('li');
@@ -562,10 +591,40 @@
                     list.appendChild(li);
                 }
 
+                function addEllipsis() {
+                    const li = document.createElement('li');
+                    li.className = 'page-item disabled';
+
+                    const span = document.createElement('span');
+                    span.className = 'page-link';
+                    span.textContent = '...';
+
+                    li.appendChild(span);
+                    list.appendChild(li);
+                }
+
+                const windowSize = 2;
+                const startPage = Math.max(1, state.page - windowSize);
+                const endPage = Math.min(totalPages, state.page + windowSize);
+
                 addItem('Anterior', Math.max(1, state.page - 1), state.page === 1, false);
 
-                for (let page = 1; page <= totalPages; page += 1) {
+                if (startPage > 1) {
+                    addItem('1', 1, false, state.page === 1);
+                    if (startPage > 2) {
+                        addEllipsis();
+                    }
+                }
+
+                for (let page = startPage; page <= endPage; page += 1) {
                     addItem(String(page), page, false, page === state.page);
+                }
+
+                if (endPage < totalPages) {
+                    if (endPage < totalPages - 1) {
+                        addEllipsis();
+                    }
+                    addItem(String(totalPages), totalPages, false, state.page === totalPages);
                 }
 
                 addItem('Siguiente', Math.min(totalPages, state.page + 1), state.page === totalPages, false);
@@ -662,10 +721,40 @@
                     list.appendChild(li);
                 }
 
+                function addEllipsis() {
+                    const li = document.createElement('li');
+                    li.className = 'page-item disabled';
+
+                    const span = document.createElement('span');
+                    span.className = 'page-link';
+                    span.textContent = '...';
+
+                    li.appendChild(span);
+                    list.appendChild(li);
+                }
+
+                const windowSize = 2;
+                const startPage = Math.max(1, state.page - windowSize);
+                const endPage = Math.min(totalPages, state.page + windowSize);
+
                 addItem('Anterior', Math.max(1, state.page - 1), state.page === 1, false);
 
-                for (let page = 1; page <= totalPages; page += 1) {
+                if (startPage > 1) {
+                    addItem('1', 1, false, state.page === 1);
+                    if (startPage > 2) {
+                        addEllipsis();
+                    }
+                }
+
+                for (let page = startPage; page <= endPage; page += 1) {
                     addItem(String(page), page, false, page === state.page);
+                }
+
+                if (endPage < totalPages) {
+                    if (endPage < totalPages - 1) {
+                        addEllipsis();
+                    }
+                    addItem(String(totalPages), totalPages, false, state.page === totalPages);
                 }
 
                 addItem('Siguiente', Math.min(totalPages, state.page + 1), state.page === totalPages, false);

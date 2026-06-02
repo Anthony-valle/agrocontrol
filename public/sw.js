@@ -1,11 +1,12 @@
-const CACHE_NAME = 'agrocontrol-shell-v2';
+const CACHE_NAME = 'agrocontrol-shell-v4';
 const STATIC_ASSETS = [
-  '/manifest.webmanifest?v=20260511-2',
+  '/manifest.webmanifest?v=20260602-1',
   '/NiceAdmin/assets/js/main.js',
-  '/NiceAdmin/assets/js/offline-sync.js?v=20260511-2',
+  '/NiceAdmin/assets/js/offline-sync.js?v=20260602-1',
   '/NiceAdmin/assets/css/style.css',
   '/NiceAdmin/assets/css/agro-theme.css',
-  '/NiceAdmin/assets/img/agrocontrol.png'
+  '/NiceAdmin/assets/img/agrocontrol.png',
+  '/login'
 ];
 
 self.addEventListener('install', (event) => {
@@ -36,11 +37,13 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone)).catch(() => Promise.resolve());
+          if (response && response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone)).catch(() => Promise.resolve());
+          }
           return response;
         })
-        .catch(() => caches.match(request))
+        .catch(() => caches.match(request).then((cached) => cached || caches.match('/login')))
     );
     return;
   }

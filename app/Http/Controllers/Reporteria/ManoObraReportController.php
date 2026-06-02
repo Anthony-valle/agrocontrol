@@ -3,11 +3,10 @@
 namespace App\Http\Controllers\Reporteria;
 
 use App\Http\Controllers\Controller;
-use App\Models\Consumo;
+use App\Models\Consumo_detalles;
 use App\Models\Labore;
 use App\Models\planes_detalles;
 use Illuminate\Http\Request;
-use Illuminate\Pagination\LengthAwarePaginator;
 
 class ManoObraReportController extends Controller
 {
@@ -19,36 +18,35 @@ class ManoObraReportController extends Controller
         }
 
         $labores = Labore::orderBy('nombre')->get();
-        $planificado = planes_detalles::where('categoria', 'Mano de Obra')->get();
+        $planificado = (float) planes_detalles::where('categoria', 'Mano de Obra')->sum('subtotal');
 
-        $ejecuciones = Consumo::with(['cultivo', 'detalles'])
-            ->orderByDesc('fecha_consumo')
-            ->get()
-            ->flatMap(function ($consumo) {
-                return $consumo->detalles
-                    ->where('categoria', 'Mano de Obra')
-                    ->map(function ($detalle) use ($consumo) {
-                        return [
-                            'fecha' => $consumo->fecha_consumo,
-                            'cultivo' => $consumo->cultivo->nombre ?? '-',
-                            'descripcion' => $detalle->descripcion,
-                            'cantidad' => (float) $detalle->cantidad,
-                            'unidad_medida' => $detalle->unidad_medida,
-                            'subtotal' => (float) $detalle->subtotal,
-                        ];
-                    });
-            })
-            ->values();
+        $ejecucionesQuery = Consumo_detalles::query()
+            ->join('consumos', 'consumos.id', '=', 'consumo_detalles.consumo_id')
+            ->leftJoin('cultivos', 'cultivos.id', '=', 'consumos.cultivo_id')
+            ->where('consumo_detalles.categoria', 'Mano de Obra')
+            ->orderByDesc('consumos.fecha_consumo')
+            ->select([
+                'consumos.fecha_consumo as fecha',
+                'cultivos.nombre as cultivo',
+                'consumo_detalles.descripcion',
+                'consumo_detalles.cantidad',
+                'consumo_detalles.unidad_medida',
+                'consumo_detalles.subtotal',
+            ]);
+
+        $ejecutado = (float) (clone $ejecucionesQuery)->sum('consumo_detalles.subtotal');
+
+        $ejecuciones = $ejecucionesQuery
+            ->paginate($perPage)
+            ->withQueryString();
 
         $metricas = [
             'catalogo' => $labores->count(),
             'activas' => $labores->where('estado', 1)->count(),
             'costo_promedio' => (float) $labores->avg('costo_unitario'),
-            'planificado' => (float) $planificado->sum('subtotal'),
-            'ejecutado' => (float) $ejecuciones->sum('subtotal'),
+            'planificado' => $planificado,
+            'ejecutado' => $ejecutado,
         ];
-
-        $ejecuciones = $this->paginarColeccion($ejecuciones, $perPage, $request);
 
         $resumenSecundaria = $labores
             ->groupBy(fn ($labor) => $labor->actividad_secundaria ?: 'Sin actividad secundaria')
@@ -64,23 +62,5 @@ class ManoObraReportController extends Controller
             ->values();
 
         return view('modules.reporteria.mano_obra', compact('labores', 'metricas', 'resumenSecundaria', 'ejecuciones', 'perPage'));
-    }
-
-    private function paginarColeccion(mixed $items, int $perPage, Request $request): LengthAwarePaginator
-    {
-        $page = LengthAwarePaginator::resolveCurrentPage();
-        $total = $items->count();
-        $resultados = $items->slice(($page - 1) * $perPage, $perPage)->values();
-
-        return new LengthAwarePaginator(
-            $resultados,
-            $total,
-            $perPage,
-            $page,
-            [
-                'path' => $request->url(),
-                'query' => $request->query(),
-            ]
-        );
     }
 }

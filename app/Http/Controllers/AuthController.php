@@ -196,7 +196,7 @@ class AuthController extends Controller
             'empresa_id' => $empresa->id,
             'estado' => true,
             'imagen_usuario' => 'avatars/admin_avatar7.png',
-            'access_permissions' => json_encode([]),
+            'access_permissions' => [],
         ]));
         $user->save();
 

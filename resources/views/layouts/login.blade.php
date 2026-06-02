@@ -68,7 +68,7 @@
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function () {
-        navigator.serviceWorker.register('/sw.js?v=20260511-2').catch(function (error) {
+        navigator.serviceWorker.register('/sw.js?v=20260602-1').catch(function (error) {
           console.warn('No se pudo registrar service worker:', error);
         });
       });

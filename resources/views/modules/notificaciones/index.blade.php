@@ -87,13 +87,20 @@
                             </span>
                             <input type="text" name="search" id="notificacionesBusqueda" class="form-control border-start-0" value="{{ $search }}" placeholder="Buscar notificación, tipo o usuario...">
                         </div>
+
+                        <div class="d-flex align-items-center gap-2">
+                            <select name="sort" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                                <option value="recentes" {{ ($sort ?? 'recentes') === 'recentes' ? 'selected' : '' }}>Recientes arriba</option>
+                                <option value="antiguas" {{ ($sort ?? '') === 'antiguas' ? 'selected' : '' }}>Antiguas arriba</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div class="d-flex gap-2 shrink-0 ms-md-auto">
                         <button type="submit" class="btn btn-primary btn-sm shadow-sm">
                             <i class="fa-solid fa-filter me-1"></i> Filtrar
                         </button>
-                        @if($search !== '' || (int) $perPage !== 15)
+                        @if($search !== '' || (int) $perPage !== 15 || (($sort ?? 'recentes') !== 'recentes'))
                             <a href="{{ route('notificaciones.index') }}" class="btn btn-outline-secondary btn-sm shadow-sm">
                                 <i class="fa-solid fa-eraser me-1"></i> Limpiar
                             </a>
@@ -121,6 +128,7 @@
                                     $mensajeMostrar = preg_replace('/\s*\[[^\]]+\]\s*$/', '', $mensajeCompleto) ?? $mensajeCompleto;
                                     $tipo = strtolower((string) $n->tipo);
                                     $badgeClass = match ($tipo) {
+                                        'compra' => 'bg-primary',
                                         'consumo' => 'bg-success',
                                         'cosecha' => 'bg-info text-dark',
                                         'mecanizacion' => 'bg-warning text-dark',
@@ -128,6 +136,7 @@
                                         default => 'bg-dark',
                                     };
                                     $tipoLabel = match ($tipo) {
+                                        'compra' => 'Compras',
                                         'mecanizacion' => 'Mecanización',
                                         'auditoria' => 'Auditoría',
                                         default => ucfirst((string) $n->tipo),

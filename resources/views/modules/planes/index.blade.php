@@ -19,9 +19,11 @@
                         </select>
                     </div>
                     <div class="d-flex align-items-center gap-2 flex-nowrap acciones-planes-form">
+                        @if(auth()->user()?->canManageMassImports())
                         <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalImportarPlan">
                             <i class="fa-solid fa-file-import me-1"></i> Carga Masiva
                         </button>
+                        @endif
                         <a href="{{ route('planes.create') }}" class="btn btn-primary btn-sm">
                              <i class="fa-solid fa-circle-plus me-1"></i> Nuevo Plan
                         </a>
@@ -51,14 +53,14 @@
                                             $semanaMin = $plan->detalles_min_semana;
                                             $semanaMax = $plan->detalles_max_semana;
                                         @endphp
-                                        @if($semanaMin && $semanaMax)
+                                        @if($semanaMin !== null && $semanaMax !== null)
                                             {{ $semanaMin === $semanaMax ? 'Semana ' . $semanaMin : 'Semanas ' . $semanaMin . ' - ' . $semanaMax }}
                                         @else
                                             -
                                         @endif
                                     </td>
                                     <td>{{ $plan->fecha_plan }}</td>
-                                    <td class="fw-bold">{{ agro_number($plan->total_presupuesto, 2) }} L</td>
+                                    <td class="fw-bold">{{ agro_number($plan->total_presupuesto, 3) }} L</td>
                                     <td><span class="badge bg-warning text-dark">{{ $plan->estado }}</span></td>
                                     <td>
                                         <a href="{{ route('planes.show', $plan->id) }}" class="btn btn-info btn-sm">
@@ -118,12 +120,7 @@
                     </div>
 
                     <div class="row g-3 mb-3">
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold mb-1">Plan base opcional</label>
-                            <input type="number" min="1" class="form-control" name="plan_id_base" placeholder="ID del plan existente">
-                            <small class="text-muted">Si lo llenas, los detalles del Excel se agregan al plan indicado.</small>
-                        </div>
-                        <div class="col-md-8">
+                        <div class="col-12">
                             <label class="form-label small fw-semibold mb-1">Archivo Excel</label>
                             <input type="file" class="form-control" name="archivo_excel" accept=".xlsx,.xls,.csv" required>
                         </div>
@@ -133,7 +130,6 @@
                         <table class="table table-sm table-bordered align-middle mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th>plan_id_base</th>
                                     <th>cultivo_id</th>
                                     <th>cultivo_codigo</th>
                                     <th>cultivo_nombre</th>
@@ -148,12 +144,11 @@
                             </thead>
                             <tbody>
                                 <tr>
-                                    <td></td>
                                     <td>3</td>
                                     <td>CUL-0001</td>
                                     <td>Maiz Amarillo</td>
                                     <td>21/4/2026</td>
-                                    <td>1</td>
+                                    <td>0</td>
                                     <td>Mano de Obra</td>
                                     <td>Limpieza de terreno</td>
                                     <td>3</td>
@@ -161,12 +156,11 @@
                                     <td>400</td>
                                 </tr>
                                 <tr>
-                                    <td></td>
                                     <td>3</td>
                                     <td>CUL-0001</td>
                                     <td>Maiz Amarillo</td>
                                     <td>21/4/2026</td>
-                                    <td>1</td>
+                                    <td>0</td>
                                     <td>Preparacion de Suelo</td>
                                     <td>Arado mecanizado</td>
                                     <td>1</td>
@@ -181,11 +175,15 @@
                         <small>
                             Esta carga masiva crea o actualiza <b>planes de cultivo</b> y agrega automáticamente sus <b>detalles por semana</b> a partir del archivo Excel.
                             <br>
-                            <b>plan_id_base</b> es opcional. Si lo envía, la importación agrega los detalles al plan existente en vez de crear uno nuevo.
+                            Todo el Excel se interpreta como una receta base de <b>1 HA</b>. La columna <b>cantidad_estimada</b> corresponde a 1 HA y el sistema calcula el total multiplicandola automaticamente por las <b>hectareas del cultivo</b> seleccionado.
                             <br>
-                            <b>cultivo_id</b> es obligatorio y debe existir en el catalogo de cultivos.
+                            El <b>costo_unitario</b> del archivo se usa junto con esa cantidad base de 1 HA para calcular el subtotal y el presupuesto final segun las hectareas reales del cultivo.
                             <br>
-                            Si varias filas pertenecen al mismo plan, puede repetir o dejar vacíos <b>cultivo_id</b> y <b>fecha_plan</b> en las filas siguientes; se reutiliza el valor anterior.
+                            Debes identificar el cultivo principalmente con <b>cultivo_id</b>, que corresponde al ID del cultivo en el modulo Cultivo. <b>cultivo_codigo</b> y <b>cultivo_nombre</b> quedan como referencia de apoyo.
+                            <br>
+                            Si <b>cultivo_id</b> viene informado, el sistema tomara ese valor como referencia principal para crear y validar el plan de cultivo.
+                            <br>
+                            Cada fila se procesa de forma independiente. Si una fila pertenece a otro cultivo o a otra semana, debe traer sus propios valores en <b>cultivo_id</b>, <b>cultivo_codigo</b>, <b>cultivo_nombre</b>, <b>fecha_plan</b> y <b>semana</b>.
                             <br>
                             <b>categoria</b> puede venir como Mano de Obra, Fertilizante, Fitosanitario, Preparacion de Suelo, Otros Insumos u otra categoria definida en su archivo.
                             <br>
@@ -193,7 +191,7 @@
                             <br>
                             <b>cosecha_estimada</b> no va en Excel: ese dato se toma automaticamente del cultivo creado en el sistema.
                             <br>
-                            La columna <b>semana</b> representa la <b>semana de cultivo</b> y debe venir entre 1 y 52.
+                            La columna <b>semana</b> representa la <b>semana de cultivo</b> y puede venir entre <b>0 y 52</b>, igual que en su Excel.
                             <br>
                             Si no envía <b>fecha_plan</b>, se usará la fecha actual automáticamente.
                             <br>
@@ -440,7 +438,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                     Swal.fire({
                         title: 'Carga masiva completada',
-                        html: data.summary_html || '<p class="mb-0">Los planes se importaron correctamente.</p>',
+                        html: '<p class="mb-0">La carga masiva del plan de cultivo se completo correctamente.</p>',
                         icon: 'success',
                     }).then(() => {
                         window.location.href = data.redirect || '{{ route('planes.index') }}';

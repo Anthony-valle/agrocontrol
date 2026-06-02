@@ -9,8 +9,6 @@
             </a>
         </li><!-- End Dashboard Nav -->
 
-       
-
         <!--Configuración Empresa-->
         <li class="nav-item">
             <a class="nav-link collapsed" data-bs-target="#empresa-nav" data-bs-toggle="collapse" href="#">
@@ -177,6 +175,12 @@
                         <span>Reporte de Cultivos</span>
                     </a>
                 </li>
+                <li>
+                    <a href="{{ route('reporteria.cultivos.consumos-general') }}">
+                        <i class="bi bi-grid-3x3-gap fs-6 me-2"></i>
+                        <span>Reporte General de Consumos</span>
+                    </a>
+                </li>
                 @endif
 
                 <!-- Reporte de Consumos -->
@@ -251,6 +255,31 @@
                 @endif
             </ul>
         </li>
+
+        @if(auth()->user()?->hasAccess('compras') || auth()->user()?->hasRole('compra') || auth()->user()?->isSuperUser())
+        <li class="nav-item">
+            <a class="nav-link collapsed" data-bs-target="#compras-modulo-nav" data-bs-toggle="collapse" href="#">
+                <i class="bi bi-cart4"></i><span>Módulo de Compras</span><i class="bi bi-chevron-down ms-auto"></i>
+            </a>
+            <ul id="compras-modulo-nav" class="nav-content collapse" data-bs-parent="#sidebar-nav">
+                <li>
+                    <a href="{{ route('compras.solicitudes.index') }}">
+                        <i class="bi bi-card-checklist fs-6 me-2"></i><span>Indice documental</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ route('compras.ordenes.validation.index') }}">
+                        <i class="bi bi-clipboard-check fs-6 me-2"></i><span>Validar llegada O.C.</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ route('compras.ordenes.report') }}">
+                        <i class="bi bi-journal-text fs-6 me-2"></i><span>Reporte O.C.</span>
+                    </a>
+                </li>
+            </ul>
+        </li>
+        @endif
 
 
         <!--Notificaciones-->

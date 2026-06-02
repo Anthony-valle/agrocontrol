@@ -236,7 +236,7 @@ class EntradaInicialImport implements ToCollection, SkipsEmptyRows, WithChunkRea
                 'valor_unitario',
             ],
             $this->indicesFallback($usaFormatoPlantilla, 'costo_promedio', $this->resolverIndicesRelativos($bodegaIndiceDetectado, [3, 10, 11, 12]))
-        )), 4);
+        )), 3);
         $stockMinimo = round($this->toFloat($this->obtenerValorFlexible(
             $row,
             ['stock_minimo', 'minimo', 'min_stock'],
@@ -322,6 +322,7 @@ class EntradaInicialImport implements ToCollection, SkipsEmptyRows, WithChunkRea
                 ? $costoPromedio
                 : (($inventario->costo_promedio * $stockAnterior) + ($costoPromedio * $stockInicial)) / $nuevoStock)
             : ($costoPromedio > 0 ? $costoPromedio : $inventario->costo_promedio);
+        $nuevoCostoPromedio = round((float) $nuevoCostoPromedio, 3);
 
         $this->actualizarInventarioPersistido($inventario, $this->filtrarColumnasPersistidas('inventario_bodegas', [
             'stock_actual' => $nuevoStock,
@@ -360,7 +361,7 @@ class EntradaInicialImport implements ToCollection, SkipsEmptyRows, WithChunkRea
                 'bodega_id' => $bodega->id,
                 'cantidad' => $stockInicial,
                 'precio_unitario' => $costoPromedio,
-                'total' => $stockInicial * $costoPromedio,
+                'total' => round($stockInicial * $costoPromedio, 3),
                 'proveedor' => $proveedor,
                 'numero_lote' => $numeroLote,
                 'fecha_fabricacion' => $fechaFabricacion,

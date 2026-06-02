@@ -156,7 +156,7 @@ class CultivoHistorialSummarySheet implements FromArray, ShouldAutoSize, WithDra
                 $sheet->getStyle('A1:D2')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
                 $sheet->getStyle('B1:D1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
                 $sheet->getStyle('B2:D2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
-                $sheet->getStyle("B4:D{$totalRow}")->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER_00);
+                $sheet->getStyle("C4:D{$totalRow}")->getNumberFormat()->setFormatCode('#,##0.000');
                 $sheet->getStyle("B4:D{$totalRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
             },
         ];

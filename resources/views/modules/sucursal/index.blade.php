@@ -18,12 +18,12 @@
                         <h5 class="card-title pb-0">Configuración de la Sucursal</h5>
 
                         <!-- CONTROLES -->
-                        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 p-2 bg-light rounded shadow-sm gap-3">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 p-2 bg-light rounded shadow-sm gap-3 agro-table-toolbar">
 
                             <!-- Buscador + registros -->
-                            <div class="d-flex align-items-center gap-3">
-                                <div class="d-flex align-items-center gap-2">
-                                    <select id="customPerPage" class="form-select form-select-sm" style="width:auto;">
+                            <div class="d-flex align-items-center gap-3 agro-table-toolbar-group">
+                                <div class="d-flex align-items-center gap-2 agro-toolbar-records">
+                                    <select id="customPerPage" class="form-select form-select-sm agro-toolbar-select" style="width:auto;">
                                         <option value="5">5</option>
                                         <option value="10" selected>10</option>
                                         <option value="20">20</option>
@@ -32,7 +32,7 @@
                                     <small class="text-muted">registros</small>
                                 </div>
 
-                                <div class="input-group input-group-sm" style="max-width:250px;">
+                                <div class="input-group input-group-sm agro-toolbar-search" style="max-width:250px;">
                                     <span class="input-group-text bg-white border-end-0">
                                         <i class="fa fa-search text-muted"></i>
                                     </span>

@@ -32,14 +32,23 @@ class CultivoHistorialDetailsSheet implements FromArray, ShouldAutoSize, WithDra
 
     public function array(): array
     {
-        $rows = $this->buildRows()->all();
+        $rows = $this->buildRows()->values()->map(function (array $row, int $index) {
+            $excelRow = $index + 4;
+            $row['subtotal_formula'] = '=I' . $excelRow . '*K' . $excelRow;
+
+            unset($row['categoria_orden'], $row['fecha_orden']);
+
+            return array_values($row);
+        })->all();
+
+        $totalRow = count($rows) + 4;
 
         return array_merge([
             ['Reporte de Consumos - ' . $this->cultivo->nombre],
             ['Generado', now()->format('d/m/Y H:i')],
-            ['Fecha', 'Lote', 'Cultivo', 'Categoria', 'Codigo', 'Insumo', 'Concepto', 'Lote consumido', 'Ingrediente activo', 'Cantidad', 'Unidad', 'Subtotal'],
+            ['fecha_consumo', 'lote', 'cultivo_nombre', 'categoria', 'insumo_codigo', 'insumo_nombre', 'lote_consumo', 'ingrediente_activo', 'cantidad', 'unidad_medida', 'precio_unitario', 'subtotal'],
         ], $rows, [[
-            '', '', '', '', '', '', '', '', '', '', 'TOTAL', (float) $this->consumos->flatMap(fn ($consumo) => $consumo->detalles)->sum('subtotal'),
+            '', '', '', '', '', '', '', '', '', '', 'TOTAL', '=SUM(L4:L' . ($totalRow - 1) . ')',
         ]]);
     }
 
@@ -61,12 +70,11 @@ class CultivoHistorialDetailsSheet implements FromArray, ShouldAutoSize, WithDra
                     $categoria,
                     $esRegistroConceptual ? '-' : ($insumo->codigo ?? '-'),
                     $esRegistroConceptual ? '-' : ($insumo->nombre ?? '-'),
-                    $descripcion !== '' ? $descripcion : '-',
                     $esRegistroConceptual ? '-' : ($detalle->lote ?: '-'),
                     $esRegistroConceptual ? '-' : ($insumo->ingrediente_activo ?? $insumo->ingredientes_activo ?? '-'),
                     (float) ($detalle->cantidad ?? 0),
                     $detalle->unidad_medida ?? $insumo->unidad_medida ?? '-',
-                    (float) ($detalle->subtotal ?? 0),
+                    (float) ($detalle->costo_unitario ?? 0),
                 ];
             });
         })->sort(function (array $left, array $right) {
@@ -74,13 +82,8 @@ class CultivoHistorialDetailsSheet implements FromArray, ShouldAutoSize, WithDra
             if ($categoria !== 0) {
                 return $categoria;
             }
-
             return strcmp($right['fecha_orden'], $left['fecha_orden']);
-        })->values()->map(function (array $row) {
-            unset($row['categoria_orden'], $row['fecha_orden']);
-
-            return array_values($row);
-        });
+        })->values();
     }
 
     private function normalizarCategoria(string $categoria): string
@@ -181,9 +184,11 @@ class CultivoHistorialDetailsSheet implements FromArray, ShouldAutoSize, WithDra
                     ],
                 ]);
 
-                $sheet->getStyle('J4:J' . $totalRow)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER_00);
-                $sheet->getStyle('L4:L' . $totalRow)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER_00);
-                $sheet->getStyle('J4:J' . $totalRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                $sheet->getStyle('I4:I' . $totalRow)->getNumberFormat()->setFormatCode('#,##0.000');
+                $sheet->getStyle('K4:K' . $totalRow)->getNumberFormat()->setFormatCode('#,##0.000');
+                $sheet->getStyle('L4:L' . $totalRow)->getNumberFormat()->setFormatCode('#,##0.000');
+                $sheet->getStyle('I4:I' . $totalRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                $sheet->getStyle('K4:K' . $totalRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
                 $sheet->getStyle('L4:L' . $totalRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
                 $sheet->getStyle('A1:L2')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
                 $sheet->getStyle('B1:L1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);

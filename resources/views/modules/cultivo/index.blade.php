@@ -4,6 +4,16 @@
 
 @section('contenido')
 <main id="main" class="main">
+    <style>
+        #tablaCultivos {
+            min-width: 1750px !important;
+        }
+
+        #tablaCultivos thead th,
+        #tablaCultivos tbody td {
+            white-space: nowrap;
+        }
+    </style>
 
     <div class="pagetitle">
         <h1>{{ $titulo }}</h1> 
@@ -16,6 +26,12 @@
                 <div class="card shadow-sm border-0">
                     <div class="card-body">
                         <h5 class="card-title pb-0">Configuración de Cultivo</h5>
+
+                        @if(session('import_summary_html'))
+                            <div class="alert alert-info mt-3 mb-2">
+                                {!! session('import_summary_html') !!}
+                            </div>
+                        @endif
 
                         <!-- Controles: cantidad de registros + buscador + botón nuevo -->
                         <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 p-2 bg-light rounded shadow-sm gap-3">
@@ -41,14 +57,21 @@
                             </div>
 
                             <!-- Botón Nuevo -->
-                            <button type="button" class="btn btn-primary btn-sm" id="btnAbrirModal">
-                                <i class="fa-solid fa-circle-plus me-2"></i> Nuevo Cultivo
-                            </button>
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                @if(auth()->user()?->canManageMassImports())
+                                <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalImportarCultivo">
+                                    <i class="fa-solid fa-file-import me-2"></i> Carga Masiva
+                                </button>
+                                @endif
+                                <button type="button" class="btn btn-primary btn-sm" id="btnAbrirModal">
+                                    <i class="fa-solid fa-circle-plus me-2"></i> Nuevo Cultivo
+                                </button>
+                            </div>
                         </div>
 
                         <!-- Tabla responsive -->
                         <div class="table-responsive border rounded">
-                            <table class="table table-hover table-sm align-middle mb-0" id="tablaCultivos" style="min-width:1500px;">
+                            <table class="table table-hover table-sm align-middle mb-0" id="tablaCultivos" style="min-width:1750px;">
                                 <thead class="table-light">
                                     <tr>
                                         <th>ID</th>
@@ -148,6 +171,159 @@
     <div class="modal fade" id="modalCultivoShow" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content" id="modalContentShow"></div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalImportarCultivo" tabindex="-1" aria-labelledby="modalImportarCultivoLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white border-0">
+                    <h5 class="modal-title" id="modalImportarCultivoLabel">
+                        <i class="fa-solid fa-file-import me-2"></i> Carga masiva de cultivos cerrados e historial
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+
+                <form action="{{ route('cultivo.importar') }}" method="POST" enctype="multipart/form-data">
+                    @csrf
+                    <div class="modal-body px-4 py-3">
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
+                            <p class="fw-semibold mb-0">Plantilla Excel para cultivos cerrados con consumo historico opcional:</p>
+                            <a href="{{ route('cultivo.importar.template') }}" class="btn btn-outline-success btn-sm">
+                                <i class="fa-solid fa-file-arrow-down me-1"></i> Descargar plantilla
+                            </a>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-12">
+                                <label class="form-label small fw-semibold mb-1">Archivo Excel o CSV</label>
+                                <input type="file" class="form-control" name="archivo_excel" accept=".xlsx,.xls,.csv" required>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive mb-3">
+                            <table class="table table-sm table-bordered align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>codigo</th>
+                                        <th>nombre</th>
+                                        <th>lote_id</th>
+                                        <th>lote_nombre</th>
+                                        <th>variedad</th>
+                                        <th>ciclo</th>
+                                        <th>fecha_siembra</th>
+                                        <th>duracion_ciclo</th>
+                                        <th>hectareas</th>
+                                        <th>cosecha_estimada</th>
+                                        <th>unidad_medida</th>
+                                        <th>estado</th>
+                                        <th>observaciones</th>
+                                        <th>fecha_consumo</th>
+                                        <th>aplicar_consumo_real_bodega</th>
+                                        <th>insumo_codigo</th>
+                                        <th>insumo_nombre</th>
+                                        <th>categoria_consumo</th>
+                                        <th>descripcion_consumo</th>
+                                        <th>cantidad_por_ha</th>
+                                        <th>unidad_consumo</th>
+                                        <th>costo_unitario_consumo</th>
+                                        <th>bodega_id</th>
+                                        <th>bodega_nombre</th>
+                                        <th>lote_consumo</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>CUL-HIST-001</td>
+                                        <td>Maiz Historico</td>
+                                        <td>1</td>
+                                        <td></td>
+                                        <td>Hibrido A</td>
+                                        <td>Primera</td>
+                                        <td>2025-01-15</td>
+                                        <td>130</td>
+                                        <td>2.500</td>
+                                        <td>4500.000</td>
+                                        <td>kg</td>
+                                        <td>Cerrado</td>
+                                        <td>Cultivo cargado desde historial</td>
+                                        <td>2025-02-10</td>
+                                        <td>NO</td>
+                                        <td>INS-001</td>
+                                        <td>Urea 46%</td>
+                                        <td>Fertilizante</td>
+                                        <td>Urea aplicada antes del sistema</td>
+                                        <td>4.250</td>
+                                        <td>kg</td>
+                                        <td>590.125</td>
+                                        <td>2</td>
+                                        <td>Bodega Central</td>
+                                        <td>LOT-2025-001</td>
+                                    </tr>
+                                    <tr>
+                                        <td>CUL-HIST-002</td>
+                                        <td>Pitahaya Historica</td>
+                                        <td></td>
+                                        <td>Lote Central</td>
+                                        <td>Roja</td>
+                                        <td>Ciclo 1</td>
+                                        <td>2024-05-20</td>
+                                        <td>365</td>
+                                        <td>1.250</td>
+                                        <td>3200.500</td>
+                                        <td>kg</td>
+                                        <td>Cerrado</td>
+                                        <td>Consumo si debe bajar inventario</td>
+                                        <td>2024-06-15</td>
+                                        <td>SI</td>
+                                        <td>INS-014</td>
+                                        <td>Sulfato de Potasio</td>
+                                        <td>Fertilizante</td>
+                                        <td>Aplicacion real tomada de bodega</td>
+                                        <td>2.750</td>
+                                        <td>kg</td>
+                                        <td>837.990</td>
+                                        <td>3</td>
+                                        <td>Bodega Insumos</td>
+                                        <td>LOT-PIT-014</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="alert alert-info mb-0 border-0 rounded-3">
+                            <small>
+                                Puedes identificar el lote con <b>lote_id</b> o con <b>lote_nombre</b>.
+                                <br>
+                                Las columnas obligatorias son <b>codigo</b>, <b>nombre</b>, <b>variedad</b>, <b>ciclo</b>, <b>fecha_siembra</b>, <b>duracion_ciclo</b> y <b>unidad_medida</b>.
+                                <br>
+                                <b>fecha_cosecha</b> no va en el archivo: el sistema la calcula automáticamente con fecha_siembra + duracion_ciclo.
+                                <br>
+                                <b>hectareas</b> y <b>cosecha_estimada</b> aceptan 3 decimales.
+                                <br>
+                                Usa <b>estado = Cerrado</b> para cargar cultivos historicos ya finalizados.
+                                <br>
+                                Si llenas <b>fecha_consumo</b> y <b>cantidad_por_ha</b>, el sistema registra un consumo historico para ese cultivo.
+                                <br>
+                                Esa cantidad se toma como valor para <b>1 HA</b> y el sistema la multiplica automaticamente por las <b>hectareas del cultivo</b> creado o encontrado.
+                                <br>
+                                Si <b>aplicar_consumo_real_bodega = SI</b>, entonces valida <b>insumo</b>, <b>bodega/almacen</b> y <b>lote</b> y descuenta stock real de inventario.
+                                <br>
+                                Si <b>aplicar_consumo_real_bodega = NO</b>, guarda el consumo historico sin tocar inventario, ideal para consumos ocurridos antes de usar el sistema.
+                                <br>
+                                <b>bodega_id</b> o <b>bodega_nombre</b> y <b>lote_consumo</b> quedan en el detalle del consumo para trazabilidad.
+                            </small>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer border-0 pt-0 px-4 pb-4">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fa-solid fa-upload me-1"></i> Importar cultivos
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 

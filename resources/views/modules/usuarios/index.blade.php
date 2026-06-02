@@ -18,14 +18,17 @@
                         <h5 class="card-title">Administrar Usuarios</h5>
 
                         <!-- Buscador y botón Nuevo Usuario -->
-                        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 p-2 bg-light rounded shadow-sm gap-3">
-                            <div class="d-flex align-items-center gap-3">
-                                <select class="form-select form-select-sm" id="selectPerPage" style="width:auto;">
-                                    <option value="5">5</option>
-                                    <option value="10" selected>10</option>
-                                    <option value="25">25</option>
-                                </select>
-                                <input type="text" class="form-control form-control-sm" id="inputBuscar" placeholder="Buscar usuario...">
+                        <div class="agro-table-toolbar">
+                            <div class="agro-table-toolbar-group">
+                                <div class="agro-toolbar-records">
+                                    <select class="form-select form-select-sm agro-toolbar-select" id="selectPerPage" style="width:auto;">
+                                        <option value="5">5</option>
+                                        <option value="10" selected>10</option>
+                                        <option value="25">25</option>
+                                    </select>
+                                    <small class="text-muted">registros</small>
+                                </div>
+                                <input type="text" class="form-control form-control-sm agro-toolbar-search" id="inputBuscar" placeholder="Buscar usuario...">
                             </div>
                             <button type="button" class="btn btn-primary btn-sm" id="btnAbrirModal">
                                 <i class="fa fa-plus me-1"></i> Nuevo Usuario
@@ -51,8 +54,8 @@
                         </div>
 
                         <!-- TABLA USUARIOS -->
-                        <div class="table-responsive">
-                            <table class="table table-hover border rounded" id="tablaUsuarios">
+                        <div class="table-responsive agro-table-shell">
+                            <table class="table table-hover agro-table" id="tablaUsuarios">
                                 <thead class="table-light">
                                     <tr>
                                         <th>ID</th>
@@ -83,29 +86,44 @@
                                                 <img src="{{ $item->imagen_usuario_url }}" alt="Avatar" class="rounded-circle" width="40" height="40" style="object-fit: cover;" onerror="this.onerror=null;this.src='{{ asset('NiceAdmin/assets/img/default-user-avatar.svg') }}';">
                                             </td>
                                             <td>{{ $item->creador->usuario ?? 'Sistema' }}</td>
-                                            <td>
-                                                <a href="#" class="btn btn-warning btn-sm me-1 btnEditarUsuario" data-id="{{ $item->id }}">
+                                            <td class="text-center text-nowrap">
+                                                <div class="d-inline-flex align-items-center gap-2 flex-nowrap acciones-usuario-wrap">
+                                                <a href="#" class="btn btn-warning btn-sm btnEditarUsuario" data-id="{{ $item->id }}">
                                                     <i class="fa-solid fa-pen-to-square"></i>
                                                 </a>
                                                 @if(auth()->user()?->hasAnyRole(['propietario', 'admin']))
-                                                <button type="button" class="btn btn-secondary btn-sm me-1 btnRevealTempPassword" data-id="{{ $item->id }}" data-usuario="{{ $item->usuario }}" title="Ver contraseña temporal">
+                                                <button type="button" class="btn btn-secondary btn-sm btnRevealTempPassword" data-id="{{ $item->id }}" data-usuario="{{ $item->usuario }}" title="Ver contraseña temporal">
                                                     <i class="fa-solid fa-eye"></i>
                                                 </button>
                                                 @endif
                                                 @if(auth()->user()?->isSuperUser() || auth()->id() === $item->id)
-                                                <button type="button" class="btn btn-info btn-sm me-1 btnResetPassword" data-id="{{ $item->id }}" data-usuario="{{ $item->usuario }}" title="Restablecer contraseña">
+                                                <button type="button" class="btn btn-info btn-sm btnResetPassword" data-id="{{ $item->id }}" data-usuario="{{ $item->usuario }}" title="Restablecer contraseña">
                                                     <i class="fa-solid fa-key"></i>
                                                 </button>
                                                 @endif
                                                 <button type="button" class="btn btn-danger btn-sm btnEliminarUsuario" data-id="{{ $item->id }}">
                                                     <i class="fa-solid fa-trash"></i>
                                                 </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     @endforeach
                                 </tbody>
                             </table>
                         </div>
+                        <style>
+                        #tablaUsuarios td.text-nowrap {
+                            vertical-align: middle;
+                        }
+
+                        .acciones-usuario-wrap .btn {
+                            min-width: 36px;
+                            height: 36px;
+                            display: inline-flex;
+                            align-items: center;
+                            justify-content: center;
+                        }
+                        </style>
                         <!-- End Table -->
 
                     </div>
@@ -119,6 +137,52 @@
 
 <!-- SCRIPT VER CONTRASEÑA TEMPORAL (SOLO PROPIETARIO) -->
 <script>
+function initUsuarioBodegaConsumoState(scope = document) {
+    const rolSelect = scope.querySelector('#usuario_rol_id');
+    const bodegaSelect = scope.querySelector('#bodega_id_consumo');
+    const bodegaWrap = scope.querySelector('#bodegaConsumoWrap');
+    const bodegaHelp = scope.querySelector('#bodegaConsumoHelp');
+
+    if (!rolSelect || !bodegaSelect || !bodegaWrap) {
+        return;
+    }
+
+    const syncBodegaRequirement = () => {
+        const selectedOption = rolSelect.options[rolSelect.selectedIndex];
+        const roleName = String(selectedOption?.dataset?.roleName || '')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]/g, '');
+        const isNotificador = roleName === 'notificador';
+
+        bodegaSelect.required = isNotificador;
+        bodegaSelect.disabled = !isNotificador;
+        bodegaWrap.classList.toggle('d-none', !isNotificador);
+        bodegaWrap.classList.toggle('border', isNotificador);
+        bodegaWrap.classList.toggle('rounded', isNotificador);
+        bodegaWrap.classList.toggle('p-2', isNotificador);
+        bodegaWrap.classList.toggle('bg-light', isNotificador);
+
+        if (!isNotificador) {
+            bodegaSelect.value = '';
+        }
+
+        if (bodegaHelp) {
+            bodegaHelp.textContent = isNotificador
+                ? 'Obligatoria para el rol notificador. Ese usuario solo podrá consumir desde esta bodega.'
+                : 'Opcional para otros roles.';
+        }
+    };
+
+    if (!rolSelect.dataset.boundBodegaConsumo) {
+        rolSelect.addEventListener('change', syncBodegaRequirement);
+        rolSelect.dataset.boundBodegaConsumo = '1';
+    }
+
+    syncBodegaRequirement();
+}
+
 document.addEventListener('click', function(e){
     if(!e.target.closest('.btnRevealTempPassword')){
         return;
@@ -301,6 +365,7 @@ document.getElementById('btnAbrirModal').addEventListener('click', function() {
         .then(html => {
             document.getElementById('modalContent').innerHTML = html;
             new bootstrap.Modal(document.getElementById('modalUsuario')).show();
+            initUsuarioBodegaConsumoState(document.getElementById('modalContent'));
 
             const password = document.getElementById('password');
             const confirmPassword = document.getElementById('password_confirmation');
@@ -459,6 +524,7 @@ document.addEventListener('click', function(e){
 
                 modalContentEdit.innerHTML = html;
                 new bootstrap.Modal(modalEditElement).show();
+                initUsuarioBodegaConsumoState(modalContentEdit);
 
                 const formEditarUsuario = modalContentEdit.querySelector('#formEditarUsuario') || modalContentEdit.querySelector(`form[action*="/usuarios/${id}"]`);
                 const password = formEditarUsuario?.querySelector('#password');

@@ -41,25 +41,25 @@
 
             <div class="col-md-4 mb-3">
                 <label class="small fw-bold">Cantidad Bruta</label>
-                <input type="number" step="0.01" name="cantidad_bruta" id="cosecha_cantidad_bruta"
+                <input type="number" step="0.001" name="cantidad_bruta" id="cosecha_cantidad_bruta"
                     class="form-control" value="{{ old('cantidad_bruta') }}" required>
             </div>
 
             <div class="col-md-4 mb-3">
                 <label class="small fw-bold">Descarte</label>
-                <input type="number" step="0.01" name="descarte" id="cosecha_descarte"
+                <input type="number" step="0.001" name="descarte" id="cosecha_descarte"
                     class="form-control" value="{{ old('descarte', 0) }}">
             </div>
 
             <div class="col-md-4 mb-3">
                 <label class="small fw-bold">Cantidad Neta</label>
-                <input type="number" step="0.01" id="cosecha_cantidad_neta"
+                <input type="number" step="0.001" id="cosecha_cantidad_neta"
                     class="form-control bg-light" readonly value="{{ old('cantidad_neta') }}">
             </div>
 
             <div class="col-md-4 mb-3">
                 <label class="small fw-bold">Disponible</label>
-                <input type="number" step="0.01" id="cosecha_cantidad_disponible"
+                <input type="number" step="0.001" id="cosecha_cantidad_disponible"
                     class="form-control bg-light" readonly value="{{ old('cantidad_neta') }}">
             </div>
 
@@ -100,8 +100,8 @@ document.addEventListener('DOMContentLoaded', function() {
         let neta = bruta - desc;
         if (neta < 0) neta = 0;
 
-        cantidadNeta.value = neta.toFixed(2);
-        cantidadDisponible.value = neta.toFixed(2);
+        cantidadNeta.value = neta.toFixed(3);
+        cantidadDisponible.value = neta.toFixed(3);
     }
 
     function actualizarEstadoCultivo() {

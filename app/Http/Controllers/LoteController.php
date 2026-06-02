@@ -18,7 +18,22 @@ class LoteController extends Controller
     public function index()
     {
         $titulo = 'Configuración de Lote';
-        $lotes = Lote::with(['sucursal', 'creador'])->get();
+        $lotes = Lote::query()
+            ->select($this->selectExistingColumns('lotes', [
+                'id',
+                'codigo',
+                'nombre',
+                'area',
+                'estado',
+                'created_by',
+                'sucursal_id',
+            ]))
+            ->with([
+                'sucursal:id,nombre',
+                'creador:id,usuario',
+            ])
+            ->get();
+
         return view('modules.lotes.index', compact('titulo', 'lotes'));
     }
 
@@ -112,13 +127,23 @@ class LoteController extends Controller
 
     private function getSucursalesDisponibles()
     {
-        $query = Sucursale::query()->orderBy('nombre');
+        $query = Sucursale::query()
+            ->select($this->selectExistingColumns('sucursales', ['id', 'nombre', 'estado']))
+            ->orderBy('nombre');
 
         if (Schema::hasColumn('sucursales', 'estado')) {
             $query->where('estado', 1);
         }
 
         return $query->get();
+    }
+
+    private function selectExistingColumns(string $table, array $columns): array
+    {
+        $availableColumns = array_flip(Schema::getColumnListing($table));
+        $selectedColumns = array_values(array_intersect($columns, array_keys($availableColumns)));
+
+        return ! empty($selectedColumns) ? $selectedColumns : ['id'];
     }
 
     private function resolveSucursal(int $sucursalId): Sucursale

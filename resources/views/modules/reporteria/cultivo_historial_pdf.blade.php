@@ -219,9 +219,9 @@ th {
                         <th>Total</th>
                         <th>Código</th>
                         <th>Cat</th>
-                        <th>Descripción</th>
                         <th>Cant</th>
                         <th>UM</th>
+                        <th>P. Unitario</th>
                         <th>Sub</th>
                     </tr>
                 </thead>
@@ -255,12 +255,9 @@ th {
 
                         <td>{{ $item->categoria }}</td>
 
-                        <td class="descripcion">
-                            {{ $item->descripcion }}
-                        </td>
-
                         <td class="text-end">{{ agro_number($item->cantidad,2) }}</td>
                         <td class="text-center">{{ $item->unidad_medida }}</td>
+                        <td class="text-end">L {{ agro_number($item->costo_unitario,2) }}</td>
                         <td class="text-end">L {{ agro_number($item->subtotal,2) }}</td>
 
                     </tr>

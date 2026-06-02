@@ -12,7 +12,8 @@
     <section class="section dashboard">
         <div class="row g-3 mb-4">
             <div class="col-12 col-md-6 col-xl-3">
-                <div class="card info-card sales-card h-100 shadow-sm border-0">
+                <a href="{{ route('cultivo.index') }}" class="dashboard-card-link">
+                <div class="card info-card sales-card h-100 shadow-sm border-0 dashboard-click-card">
                     <div class="card-body">
                         <h5 class="card-title">Cultivos</h5>
                         <div class="d-flex align-items-center">
@@ -26,10 +27,12 @@
                         </div>
                     </div>
                 </div>
+                </a>
             </div>
 
             <div class="col-12 col-md-6 col-xl-3">
-                <div class="card info-card revenue-card h-100 shadow-sm border-0">
+                <a href="{{ route('lotes.index') }}" class="dashboard-card-link">
+                <div class="card info-card revenue-card h-100 shadow-sm border-0 dashboard-click-card">
                     <div class="card-body">
                         <h5 class="card-title">Lotes</h5>
                         <div class="d-flex align-items-center">
@@ -43,10 +46,12 @@
                         </div>
                     </div>
                 </div>
+                </a>
             </div>
 
             <div class="col-12 col-md-6 col-xl-3">
-                <div class="card info-card customers-card h-100 shadow-sm border-0">
+                <a href="{{ route('insumos.index') }}" class="dashboard-card-link">
+                <div class="card info-card customers-card h-100 shadow-sm border-0 dashboard-click-card">
                     <div class="card-body">
                         <h5 class="card-title">Insumos</h5>
                         <div class="d-flex align-items-center">
@@ -60,10 +65,12 @@
                         </div>
                     </div>
                 </div>
+                </a>
             </div>
 
             <div class="col-12 col-md-6 col-xl-3">
-                <div class="card info-card h-100 shadow-sm border-0">
+                <a href="{{ route('reporteria.alertas') }}" class="dashboard-card-link">
+                <div class="card info-card h-100 shadow-sm border-0 dashboard-click-card">
                     <div class="card-body">
                         <h5 class="card-title">Alertas</h5>
                         <div class="d-flex align-items-center">
@@ -77,6 +84,7 @@
                         </div>
                     </div>
                 </div>
+                </a>
             </div>
         </div>
 
@@ -84,7 +92,9 @@
             <div class="col-12 col-xl-6">
                 <div class="card shadow-sm border-0 h-100">
                     <div class="card-header bg-white border-0">
-                        <h5 class="card-title mb-0">Cultivos recientes</h5>
+                        <h5 class="card-title mb-0">
+                            <a href="{{ route('cultivo.index') }}" class="dashboard-section-link">Cultivos recientes</a>
+                        </h5>
                     </div>
                     <div class="card-body">
                         <div class="table-responsive">
@@ -97,7 +107,7 @@
                                 </thead>
                                 <tbody>
                                     @forelse(($cultivosActivos ?? collect()) as $cultivo)
-                                        <tr>
+                                        <tr class="dashboard-click-row" onclick="window.location='{{ route('cultivo.index') }}'">
                                             <td>{{ $cultivo->codigo ?? '—' }}</td>
                                             <td>{{ $cultivo->nombre ?? 'Sin nombre' }}</td>
                                         </tr>
@@ -116,7 +126,9 @@
             <div class="col-12 col-xl-6">
                 <div class="card shadow-sm border-0 h-100">
                     <div class="card-header bg-white border-0">
-                        <h5 class="card-title mb-0">Lotes recientes</h5>
+                        <h5 class="card-title mb-0">
+                            <a href="{{ route('lotes.index') }}" class="dashboard-section-link">Lotes recientes</a>
+                        </h5>
                     </div>
                     <div class="card-body">
                         <div class="table-responsive">
@@ -129,7 +141,7 @@
                                 </thead>
                                 <tbody>
                                     @forelse(($lotesActivos ?? collect()) as $lote)
-                                        <tr>
+                                        <tr class="dashboard-click-row" onclick="window.location='{{ route('lotes.index') }}'">
                                             <td>{{ $lote->codigo ?? '—' }}</td>
                                             <td>{{ $lote->nombre ?? 'Sin nombre' }}</td>
                                         </tr>
@@ -150,6 +162,40 @@
 </main>
 
 <style>
+.dashboard-card-link {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+}
+
+.dashboard-click-card {
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    cursor: pointer;
+}
+
+.dashboard-card-link:hover .dashboard-click-card {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 32px rgba(15, 90, 67, 0.12) !important;
+}
+
+.dashboard-click-row {
+    cursor: pointer;
+}
+
+.dashboard-click-row:hover td {
+    background: #f3faf6;
+}
+
+.dashboard-section-link {
+    color: inherit;
+    text-decoration: none;
+}
+
+.dashboard-section-link:hover,
+.dashboard-section-link:focus {
+    color: #0f5a43;
+}
+
 .dashboard .table-success th {
     background: #0f5a43;
     color: #fff;

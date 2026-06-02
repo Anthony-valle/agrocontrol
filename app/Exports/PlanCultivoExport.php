@@ -5,77 +5,108 @@ namespace App\Exports;
 use App\Models\planes_cultivo;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Concerns\WithHeadings;
+use Maatwebsite\Excel\Concerns\WithStyles;
+use Maatwebsite\Excel\Events\AfterSheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class PlanCultivoExport implements FromArray, ShouldAutoSize
+class PlanCultivoExport implements FromArray, ShouldAutoSize, WithHeadings, WithStyles, WithEvents
 {
     public function __construct(private readonly planes_cultivo $plan)
     {
     }
 
+    public function headings(): array
+    {
+        return [
+            'cultivo_id',
+            'cultivo_codigo',
+            'cultivo_nombre',
+            'fecha_plan',
+            'semana',
+            'categoria',
+            'descripcion',
+            'cantidad_estimada',
+            'unidad_medida',
+            'costo_unitario',
+        ];
+    }
+
     public function array(): array
     {
         $cultivo = $this->plan->cultivo;
-        $total = 0;
+        $hectareasCultivo = (float) ($cultivo?->hectareas ?? 0);
 
-        $filas = $this->plan->detalles
+        return $this->plan->detalles
             ->sortBy([
                 ['semana', 'asc'],
                 ['categoria', 'asc'],
+                ['descripcion', 'asc'],
             ])
             ->values()
-            ->map(function ($detalle) use (&$total) {
-                $subtotal = (float) ($detalle->subtotal ?? ($detalle->cantidad_estimada * $detalle->costo_unitario));
-                $total += $subtotal;
+            ->map(function ($detalle) use ($cultivo, $hectareasCultivo) {
+                $cantidadTotal = (float) ($detalle->cantidad_estimada ?? 0);
+                $cantidadBasePorHa = $hectareasCultivo > 0
+                    ? round($cantidadTotal / $hectareasCultivo, 3)
+                    : round($cantidadTotal, 3);
 
                 return [
-                    'Semana ' . $detalle->semana,
+                    (int) ($cultivo?->id ?? $this->plan->cultivo_id),
+                    (string) ($cultivo?->codigo ?? ''),
+                    (string) ($cultivo?->nombre ?? ''),
+                    (string) $this->plan->fecha_plan,
+                    (int) ($detalle->semana ?? 0),
                     $detalle->categoria,
-                    $this->formatearActividad($detalle->categoria, $detalle->descripcion),
-                    (float) $detalle->cantidad_estimada,
+                    trim((string) $detalle->descripcion),
+                    $cantidadBasePorHa,
                     $detalle->unidad_medida,
                     (float) $detalle->costo_unitario,
-                    $subtotal,
                 ];
             })
             ->values()
             ->all();
-
-        return array_merge([
-            ['Plan de Cultivo', '#' . $this->plan->id],
-            ['Cultivo', $cultivo?->nombre ?? '-'],
-            ['Fecha Plan', $this->plan->fecha_plan],
-            ['Cosecha Estimada', (float) ($cultivo?->cosecha_estimada ?? $this->plan->cosecha_estimada ?? 0)],
-            ['Estado', $this->plan->estado],
-            [],
-            [
-                'Semana Cultivo',
-                'Categoria',
-                'Actividad',
-                'Cantidad',
-                'Unidad',
-                'Costo Unitario',
-                'Subtotal',
-            ],
-        ], $filas, [[
-            '',
-            '',
-            '',
-            '',
-            '',
-            'TOTAL PRESUPUESTO',
-            $total,
-        ]]);
     }
 
-    private function formatearActividad(?string $categoria, ?string $descripcion): string
+    public function styles(Worksheet $sheet): array
     {
-        $actividad = trim((string) $descripcion);
-        $categoriaNormalizada = mb_strtolower(trim((string) $categoria), 'UTF-8');
+        return [
+            1 => [
+                'font' => [
+                    'bold' => true,
+                    'color' => ['rgb' => 'FFFFFF'],
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => '198754'],
+                ],
+            ],
+        ];
+    }
 
-        if (in_array($categoriaNormalizada, ['preparacion de suelo', 'preparación de suelo'], true)) {
-            $actividad = preg_replace('/^mecanizaci[oó]n\s*[-:]\s*/iu', '', $actividad) ?? $actividad;
-        }
+    public function registerEvents(): array
+    {
+        return [
+            AfterSheet::class => function (AfterSheet $event) {
+                $sheet = $event->sheet->getDelegate();
+                $lastRow = max(1, count($this->array()) + 1);
 
-        return $actividad === '' ? '-' : $actividad;
+                $sheet->freezePane('A2');
+                $sheet->setAutoFilter('A1:J1');
+                $sheet->getStyle("A1:J{$lastRow}")->applyFromArray([
+                    'borders' => [
+                        'allBorders' => [
+                            'borderStyle' => Border::BORDER_THIN,
+                            'color' => ['rgb' => 'D8DEE4'],
+                        ],
+                    ],
+                ]);
+                $sheet->getStyle("A1:J1")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle("A1:J1")->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+            },
+        ];
     }
 }

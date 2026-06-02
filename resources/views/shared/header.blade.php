@@ -71,7 +71,7 @@
   <nav class="header-nav ms-auto">
     <ul class="d-flex align-items-center">
 
-      @if(auth()->user()?->isSuperUser())
+      @if(auth()->user()?->isSuperUser() || auth()->user()?->hasRole('compra'))
       <!-- NOTIFICACIONES -->
       <li class="nav-item dropdown">
         @php
@@ -101,6 +101,7 @@
                 @php
                     $tipo = strtolower((string) $n->tipo);
                     $iconClass = match ($tipo) {
+                      'compra' => 'bi bi-cart-check text-primary',
                         'consumo' => 'bi bi-droplet-half text-success',
                         'cosecha' => 'bi bi-basket2 text-info',
                         'mecanizacion' => 'bi bi-truck text-warning',
@@ -108,6 +109,7 @@
                         default => 'bi bi-box-seam text-primary',
                     };
                     $titulo = match ($tipo) {
+                      'compra' => 'Compras',
                         'consumo' => 'Consumo',
                         'cosecha' => 'Cosecha',
                         'mecanizacion' => 'Mecanización',

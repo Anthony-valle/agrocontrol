@@ -12,6 +12,7 @@ use App\Models\FacturaInventario;
 use App\Models\Insumo;
 use App\Models\InventarioBodega;
 use App\Models\MovimientoInventario;
+use App\Models\SolicitudCompra;
 use App\Services\EntradaLegacySyncService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -167,9 +168,9 @@ class MovimientoInventarioController extends Controller
         }
 
         $insumos = Insumo::query()
+            ->activos()
             ->select($columnasInsumos)
             ->with(['inventarioBodegas:insumo_id,stock_actual,costo_promedio'])
-            ->when(Schema::hasColumn('insumos', 'estado'), fn ($query) => $query->where('estado', 1))
             ->orderBy('nombre')
             ->get();
 
@@ -179,7 +180,18 @@ class MovimientoInventarioController extends Controller
             ->orderBy('nombre')
             ->get();
 
-        return view('modules.movimientos.entradas.entrada', compact('insumos', 'bodegas'));
+        $solicitudesRecepcion = collect();
+
+        if (Schema::hasTable('solicitudes_compra')) {
+            $solicitudesRecepcion = SolicitudCompra::query()
+                ->with(['solicitante', 'insumo', 'bodegaDestino'])
+                ->whereIn('estado', [SolicitudCompra::ESTADO_APROBADA, SolicitudCompra::ESTADO_EN_PROCESO])
+                ->whereNotNull('insumo_id')
+                ->orderByDesc('id')
+                ->get();
+        }
+
+        return view('modules.movimientos.entradas.entrada', compact('insumos', 'bodegas', 'solicitudesRecepcion'));
     }
 
     public function entradaIndex()
@@ -196,7 +208,7 @@ class MovimientoInventarioController extends Controller
             ->count();
 
         $totalBodegas = Bodega::query()->count();
-        $totalInsumos = Insumo::query()->count();
+        $totalInsumos = Insumo::query()->activos()->count();
 
         return view('modules.movimientos.entradas.index', compact(
             'entradasRecientes',
@@ -208,11 +220,15 @@ class MovimientoInventarioController extends Controller
 
     public function entradaImportar()
     {
+        $this->authorizeMassImports();
+
         return view('modules.movimientos.entradas.importar_excel');
     }
 
     public function entradaImportarStore(Request $request)
     {
+        $this->authorizeMassImports();
+
         @set_time_limit(0);
         @ini_set('max_execution_time', '0');
         @ini_set('memory_limit', '1024M');
@@ -289,6 +305,8 @@ class MovimientoInventarioController extends Controller
 
     public function descargarPlantillaEntradaInicial()
     {
+        $this->authorizeMassImports();
+
         return Excel::download(new EntradaInicialTemplateExport(), 'plantilla_entrada_inicial.xlsx');
     }
 
@@ -312,6 +330,13 @@ class MovimientoInventarioController extends Controller
         return $empresaId !== null ? (int) $empresaId : null;
     }
 
+    private function authorizeMassImports(): void
+    {
+        $user = Auth::user();
+
+        abort_unless($user instanceof \App\Models\User && $user->canManageMassImports(), 403);
+    }
+
     // ----------------------------
     // Guardar Entradas
     // ----------------------------
@@ -327,6 +352,7 @@ class MovimientoInventarioController extends Controller
         }
 
         $request->validate([
+            'solicitud_compra_id' => 'nullable|exists:solicitudes_compra,id',
             'insumo_ids' => 'required|array|min:1',
             'insumo_ids.*' => 'exists:insumos,id',
             'bodega_ids.*' => 'required|exists:bodegas,id',
@@ -339,8 +365,49 @@ class MovimientoInventarioController extends Controller
             'archivos.*' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
         ]);
 
+        $solicitudCompra = null;
+
+        if ($request->filled('solicitud_compra_id') && Schema::hasTable('solicitudes_compra')) {
+            if (count($request->input('insumo_ids', [])) !== 1) {
+                return $this->responderError(
+                    $request,
+                    new \RuntimeException('La recepción desde solicitud de compra solo permite una fila por registro.'),
+                    'No se pudo registrar la entrada.'
+                );
+            }
+
+            $solicitudCompra = SolicitudCompra::query()->findOrFail((int) $request->input('solicitud_compra_id'));
+
+            if (! in_array($solicitudCompra->estado, [SolicitudCompra::ESTADO_APROBADA, SolicitudCompra::ESTADO_EN_PROCESO], true)) {
+                return $this->responderError(
+                    $request,
+                    new \RuntimeException('La solicitud seleccionada ya no está disponible para recepción.'),
+                    'No se pudo registrar la entrada.'
+                );
+            }
+
+            if ($solicitudCompra->insumo_id !== null && (int) $solicitudCompra->insumo_id !== (int) $request->input('insumo_ids.0')) {
+                return $this->responderError(
+                    $request,
+                    new \RuntimeException('El insumo de la entrada no coincide con la solicitud aprobada.'),
+                    'No se pudo registrar la entrada.'
+                );
+            }
+
+            if ($solicitudCompra->bodega_destino_id !== null && (int) $solicitudCompra->bodega_destino_id !== (int) $request->input('bodega_ids.0')) {
+                return $this->responderError(
+                    $request,
+                    new \RuntimeException('La bodega de recepción no coincide con la bodega solicitada.'),
+                    'No se pudo registrar la entrada.'
+                );
+            }
+        }
+
         try {
-            DB::transaction(function () use ($request) {
+            DB::transaction(function () use ($request, $solicitudCompra) {
+                $ultimoMovimientoId = null;
+                $ultimaFacturaId = null;
+
                 foreach ($request->insumo_ids as $index => $insumo_id) {
                     $insumo = Insumo::findOrFail($insumo_id);
                     $bodega_id = $request->bodega_ids[$index];
@@ -402,6 +469,8 @@ class MovimientoInventarioController extends Controller
                         'created_by' => Auth::id(),
                     ]));
 
+                    $ultimoMovimientoId = $movimiento->id;
+
                     $archivo = $request->file('archivos')[$index] ?? null;
                     $rutaArchivo = null;
 
@@ -428,7 +497,8 @@ class MovimientoInventarioController extends Controller
                     ]);
 
                     if ($facturaPayload !== []) {
-                        FacturaInventario::create($facturaPayload);
+                        $factura = FacturaInventario::create($facturaPayload);
+                        $ultimaFacturaId = $factura->id;
                     }
 
                     $this->entradaLegacySyncService->registrar([
@@ -442,6 +512,16 @@ class MovimientoInventarioController extends Controller
                         'fecha_ingreso' => now()->toDateString(),
                         'created_by' => Auth::id(),
                         'updated_by' => Auth::id(),
+                    ]);
+                }
+
+                if ($solicitudCompra) {
+                    $solicitudCompra->update([
+                        'estado' => SolicitudCompra::ESTADO_RECIBIDA,
+                        'recibido_por' => Auth::id(),
+                        'recibido_en' => now(),
+                        'movimiento_inventario_id' => $ultimoMovimientoId,
+                        'factura_inventario_id' => $ultimaFacturaId,
                     ]);
                 }
             });

@@ -27,6 +27,8 @@ class planes_cultivo extends Model
     ];
 
     protected $casts = [
+        'cosecha_estimada' => 'decimal:3',
+        'total_presupuesto' => 'decimal:3',
         'deleted_at' => 'datetime',
     ];
 

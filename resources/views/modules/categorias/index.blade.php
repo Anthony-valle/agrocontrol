@@ -7,21 +7,6 @@
     .categoria-estado-badge {
         display: inline-flex;
         align-items: center;
-        padding: 0.35rem 0.75rem;
-        border-radius: 999px;
-        font-size: 0.8rem;
-        font-weight: 700;
-        line-height: 1;
-    }
-
-    .categoria-estado-badge.activo {
-        background-color: #d1fae5;
-        color: #065f46;
-    }
-
-    .categoria-estado-badge.inactivo {
-        background-color: #fee2e2;
-        color: #991b1b;
     }
 </style>
 <main id="main" class="main">

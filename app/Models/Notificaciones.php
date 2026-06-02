@@ -50,25 +50,86 @@ class Notificaciones extends Model
         static::persistirParaSupervision($payload);
     }
 
+    public static function registrarParaCompras(array $payload): void
+    {
+        if (DB::transactionLevel() > 0) {
+            DB::afterCommit(function () use ($payload): void {
+                static::persistirParaCompras($payload);
+            });
+
+            return;
+        }
+
+        static::persistirParaCompras($payload);
+    }
+
     public static function persistirParaSupervision(array $payload): void
     {
         $empresaId = isset($payload['empresa_id']) && $payload['empresa_id'] !== null
             ? (int) $payload['empresa_id']
             : null;
 
-        $basePayload = [
+        $destinatarios = static::destinatariosSupervision($empresaId);
+
+        static::persistirParaDestinatarios(
+            $destinatarios,
+            static::buildBasePayload($payload),
+            !empty($payload['user_id']) ? (int) $payload['user_id'] : null,
+        );
+    }
+
+    public static function persistirParaCompras(array $payload): void
+    {
+        $empresaId = isset($payload['empresa_id']) && $payload['empresa_id'] !== null
+            ? (int) $payload['empresa_id']
+            : null;
+
+        $destinatarios = static::destinatariosCompra($empresaId);
+
+        static::persistirParaDestinatarios(
+            $destinatarios,
+            static::buildBasePayload($payload),
+            !empty($payload['user_id']) ? (int) $payload['user_id'] : null,
+        );
+    }
+
+    public static function destinatariosCompra(?int $empresaId = null): Collection
+    {
+        return User::query()
+            ->whereHas('rol', function ($query) {
+                $query->whereIn('nombre', ['compra', 'compras', 'encargado_compra', 'encargado compras']);
+            })
+            ->when($empresaId !== null, function ($query) use ($empresaId) {
+                $query->whereHas('sucursal', function ($sucursalQuery) use ($empresaId) {
+                    $sucursalQuery->withoutGlobalScopes()->where('empresa_id', $empresaId);
+                });
+            })
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+    }
+
+    private static function buildBasePayload(array $payload): array
+    {
+        $empresaId = isset($payload['empresa_id']) && $payload['empresa_id'] !== null
+            ? (int) $payload['empresa_id']
+            : null;
+
+        return [
             'empresa_id' => $empresaId,
             'cultivo_id' => isset($payload['cultivo_id']) && $payload['cultivo_id'] !== null ? (int) $payload['cultivo_id'] : null,
             'mensaje' => (string) ($payload['mensaje'] ?? ''),
             'tipo' => (string) ($payload['tipo'] ?? 'general'),
             'leido' => (bool) ($payload['leido'] ?? false),
         ];
+    }
 
-        $destinatarios = static::destinatariosSupervision($empresaId);
-
+    private static function persistirParaDestinatarios(Collection $destinatarios, array $basePayload, ?int $fallbackUserId = null): void
+    {
         if ($destinatarios->isEmpty()) {
-            if (!empty($payload['user_id'])) {
-                static::create($basePayload + ['user_id' => (int) $payload['user_id']]);
+            if ($fallbackUserId !== null) {
+                static::create($basePayload + ['user_id' => $fallbackUserId]);
             }
 
             return;

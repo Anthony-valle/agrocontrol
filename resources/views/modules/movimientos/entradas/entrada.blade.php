@@ -11,18 +11,50 @@
             Registrar Entrada de Insumos
         </h5>
         <div class="d-flex gap-2">
+            @if(auth()->user()?->canManageMassImports())
             <a href="{{ route('movimientos.entrada.importar.template') }}" class="btn btn-outline-success btn-sm shadow-sm">
                 <i class="fa-solid fa-download me-2"></i> Descargar Plantilla
             </a>
             <button type="button" class="btn btn-success btn-sm shadow-sm" data-open-import-excel="true">
                 <i class="fa-solid fa-file-excel me-2"></i> Carga Masiva Inicial (Excel)
             </button>
+            @endif
         </div>
     </div>
 
     <div class="card-body">
         <form id="entradaForm" action="{{ route('movimientos.entrada.store') }}" method="POST" enctype="multipart/form-data">
             @csrf
+
+            @if(($solicitudesRecepcion ?? collect())->isNotEmpty())
+            <div class="alert alert-info border-0 shadow-sm mt-3 mb-0">
+                <div class="row g-3 align-items-end">
+                    <div class="col-lg-8">
+                        <label class="form-label fw-bold">Recepción desde solicitud aprobada</label>
+                        <select name="solicitud_compra_id" id="solicitud_compra_id" class="form-select">
+                            <option value="">Registrar entrada manual sin solicitud</option>
+                            @foreach($solicitudesRecepcion as $solicitud)
+                                <option value="{{ $solicitud->id }}"
+                                    data-insumo-id="{{ $solicitud->insumo_id }}"
+                                    data-bodega-id="{{ $solicitud->bodega_destino_id }}"
+                                    data-cantidad="{{ agro_number($solicitud->cantidad,2,'.','') }}"
+                                    data-precio="{{ $solicitud->precio_estimado !== null ? agro_number($solicitud->precio_estimado,2,'.','') : '' }}"
+                                    data-asunto="{{ $solicitud->asunto }}"
+                                    data-unidad="{{ $solicitud->unidad }}">
+                                    {{ $solicitud->codigo ?: 'SC-' . $solicitud->id }} - {{ $solicitud->asunto }} - {{ $solicitud->solicitante->usuario ?? 'N/A' }}
+                                </option>
+                            @endforeach
+                        </select>
+                        <div class="form-text">Si eliges una solicitud aprobada o en proceso, la entrada quedará marcada como compra recibida.</div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="small text-muted border rounded bg-white px-3 py-2" id="detalleSolicitudCompra">
+                            Sin solicitud seleccionada.
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endif
             
             <div class="row g-4 mt-1">
                 <!-- COLUMNA IZQUIERDA: CONFIGURACIÓN -->
@@ -63,11 +95,11 @@
                         <div class="row g-2 mb-3">
                             <div class="col-md-6">
                                 <label class="form-label fw-bold small">Cantidad</label>
-                                <input type="number" step="0.01" id="cantidad" class="form-control" placeholder="0.00">
+                                <input type="number" step="0.001" id="cantidad" class="form-control" placeholder="0.000">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-bold small">Precio Compra</label>
-                                <input type="number" step="0.01" id="precio_unitario" class="form-control" placeholder="L 0.00">
+                                <input type="number" step="0.001" id="precio_unitario" class="form-control" placeholder="L 0.000">
                             </div>
                         </div>
 
@@ -175,12 +207,14 @@
                 <a href="{{ route('movimientos.entradas.index') }}" class="btn btn-light border px-4 fw-bold">
                     <i class="fa fa-arrow-left me-1"></i> Regresar
                 </a>
+                @if(auth()->user()?->canManageMassImports())
                 <a href="{{ route('movimientos.entrada.importar.template') }}" class="btn btn-outline-success px-4 fw-bold">
                     <i class="fa-solid fa-download me-2"></i> Plantilla Excel
                 </a>
                 <button type="button" class="btn btn-success px-4 shadow fw-bold" data-open-import-excel="true">
                     <i class="fa-solid fa-file-excel me-2"></i> Importar Excel
                 </button>
+                @endif
                 <button type="submit" class="btn btn-primary px-5 shadow fw-bold">
                     <i class="fa fa-save me-2"></i> Guardar Movimiento
                 </button>
@@ -220,9 +254,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const fechaVenInput = document.getElementById('fecha_vencimiento');
     const proveedorInput = document.getElementById('proveedor');
     const facturaInput = document.getElementById('factura');
+    const solicitudCompraSelect = document.getElementById('solicitud_compra_id');
     const btnAgregar = document.getElementById('btnAgregar');
     const cuerpoTabla = document.getElementById('cuerpoTabla');
     const botonesImportacionInicial = document.querySelectorAll('[data-open-import-excel="true"]');
+    const detalleSolicitudCompra = document.getElementById('detalleSolicitudCompra');
 
     const dCodigo = document.getElementById('datoCodigo');
     const dUnidad = document.getElementById('datoUnidad');
@@ -250,6 +286,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     initSelectBuscable('#insumo_id', 'Buscar insumo...');
     initSelectBuscable('#bodega_id', 'Buscar bodega...');
+    initSelectBuscable('#solicitud_compra_id', 'Buscar solicitud aprobada...');
 
     function mostrarErrores(error) {
         if (error && error.errors) {
@@ -392,6 +429,63 @@ document.addEventListener('DOMContentLoaded', function() {
         dLote.textContent = '-';
         dFab.textContent = '-';
         dVen.textContent = '-';
+
+        if (window.jQuery && jQuery.fn.select2) {
+            jQuery('#insumo_id').trigger('change.select2');
+            jQuery('#bodega_id').trigger('change.select2');
+        }
+    }
+
+    function aplicarSolicitudCompra() {
+        if (!solicitudCompraSelect) {
+            return;
+        }
+
+        const option = solicitudCompraSelect.selectedOptions[0];
+
+        if (!option || !option.value) {
+            if (detalleSolicitudCompra) {
+                detalleSolicitudCompra.textContent = 'Sin solicitud seleccionada.';
+            }
+            return;
+        }
+
+        const insumoId = option.dataset.insumoId || '';
+        const bodegaId = option.dataset.bodegaId || '';
+        const cantidad = option.dataset.cantidad || '';
+        const precio = option.dataset.precio || '';
+        const asunto = option.dataset.asunto || 'Solicitud de compra';
+        const unidad = option.dataset.unidad || '-';
+
+        if (insumoId) {
+            insumoSelect.value = insumoId;
+            if (window.jQuery && jQuery.fn.select2) {
+                jQuery('#insumo_id').trigger('change');
+            } else {
+                insumoSelect.dispatchEvent(new Event('change'));
+            }
+        }
+
+        if (bodegaId) {
+            bodegaSelect.value = bodegaId;
+            if (window.jQuery && jQuery.fn.select2) {
+                jQuery('#bodega_id').trigger('change');
+            }
+        }
+
+        cantidadInput.value = cantidad;
+        if (precio) {
+            precioInput.value = precio;
+        }
+        proveedorInput.value = asunto;
+
+        if (detalleSolicitudCompra) {
+            detalleSolicitudCompra.innerHTML = `
+                <div class="fw-semibold">${asunto}</div>
+                <div>Cantidad solicitada: ${cantidad || '0'} ${unidad}</div>
+                <div>Se recibirá al guardar esta entrada.</div>
+            `;
+        }
     }
 
     insumoSelect.addEventListener('change', function() {
@@ -414,6 +508,11 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     btnAgregar.addEventListener('click', function() {
+        if (solicitudCompraSelect && solicitudCompraSelect.value && cuerpoTabla.children.length > 0) {
+            Swal.fire('Validación', 'La recepción desde solicitud de compra solo permite una fila por entrada.', 'warning');
+            return;
+        }
+
         if (!insumoSelect.value || !bodegaSelect.value || !cantidadInput.value || parseFloat(cantidadInput.value)<=0 || !precioInput.value) {
             Swal.fire('Validación', 'Faltan campos obligatorios o la cantidad es inválida.', 'warning');
             return;
@@ -439,7 +538,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <input type="hidden" name="cantidades[]" value="${cantidadInput.value}">
             </td>
             <td>
-                L. ${parseFloat(precioInput.value).toFixed(2)}
+                L. ${parseFloat(precioInput.value).toFixed(3)}
                 <input type="hidden" name="precios[]" value="${precioInput.value}">
             </td>
             <td>
@@ -479,6 +578,10 @@ document.addEventListener('DOMContentLoaded', function() {
     cuerpoTabla.addEventListener('click', function(e) {
         if(e.target.closest('.btnEliminar')) e.target.closest('tr').remove();
     });
+
+    if (solicitudCompraSelect) {
+        solicitudCompraSelect.addEventListener('change', aplicarSolicitudCompra);
+    }
 
     if (botonesImportacionInicial.length) {
         botonesImportacionInicial.forEach((btn) => {

@@ -152,50 +152,17 @@
             }
 
             .tabla-consumo {
-                min-width: 0;
-            }
-
-            .tabla-consumo thead {
-                display: none;
-            }
-
-            .tabla-consumo,
-            .tabla-consumo tbody,
-            .tabla-consumo tr,
-            .tabla-consumo td,
-            .tabla-consumo tfoot,
-            .tabla-consumo tfoot tr {
-                display: block;
-                width: 100%;
-            }
-
-            .tabla-consumo tbody tr,
-            .tabla-consumo tfoot tr {
-                border-bottom: 1px solid #dfe7ef;
-                padding: 0.85rem 0;
+                min-width: 980px;
             }
 
             .tabla-consumo tbody td,
             .tabla-consumo tfoot td {
-                border: 0;
-                padding: 0.45rem 1rem;
-                text-align: left !important;
+                white-space: nowrap;
             }
 
-            .tabla-consumo tbody td::before,
-            .tabla-consumo tfoot td::before {
-                content: attr(data-label);
-                display: block;
-                margin-bottom: 0.18rem;
-                font-size: 0.76rem;
-                font-weight: 700;
-                text-transform: uppercase;
-                color: #6c7a89;
-                letter-spacing: 0.03em;
-            }
-
-            .tabla-consumo tfoot td.total-general {
-                font-size: 1.05rem;
+            .tabla-consumo .descripcion-cell {
+                min-width: 260px;
+                white-space: normal;
             }
         }
     </style>
@@ -435,10 +402,40 @@
                 list.appendChild(li);
             }
 
+            function addEllipsis() {
+                const li = document.createElement('li');
+                li.className = 'page-item disabled';
+
+                const span = document.createElement('span');
+                span.className = 'page-link';
+                span.textContent = '...';
+
+                li.appendChild(span);
+                list.appendChild(li);
+            }
+
+            const windowSize = 2;
+            const startPage = Math.max(1, state.page - windowSize);
+            const endPage = Math.min(totalPages, state.page + windowSize);
+
             addItem('Anterior', Math.max(1, state.page - 1), state.page === 1, false);
 
-            for (let page = 1; page <= totalPages; page += 1) {
+            if (startPage > 1) {
+                addItem('1', 1, false, state.page === 1);
+                if (startPage > 2) {
+                    addEllipsis();
+                }
+            }
+
+            for (let page = startPage; page <= endPage; page += 1) {
                 addItem(String(page), page, false, page === state.page);
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    addEllipsis();
+                }
+                addItem(String(totalPages), totalPages, false, state.page === totalPages);
             }
 
             addItem('Siguiente', Math.min(totalPages, state.page + 1), state.page === totalPages, false);

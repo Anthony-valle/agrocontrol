@@ -29,7 +29,7 @@ class Labore extends Model
 
     protected $casts = [
         'estado' => 'boolean',
-        'costo_unitario' => 'decimal:2',
+        'costo_unitario' => 'decimal:3',
         'deleted_at' => 'datetime',
     ];
 }

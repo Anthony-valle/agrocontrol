@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\PlanesCultivoTemplateExport;
 use App\Exports\PlanCultivoExport;
 use App\Imports\PlanesCultivoImport;
 use App\Models\Categorias;
@@ -313,20 +314,17 @@ class PlanesCultivoController extends Controller
 
     public function importar(Request $request)
     {
+        $this->authorizeMassImports();
+
+        @set_time_limit(0);
+        @ini_set('max_execution_time', '0');
+        @ini_set('memory_limit', '1024M');
+
         $request->validate([
             'archivo_excel' => 'required|file|mimes:xlsx,xls,csv',
-            'plan_id_base' => 'nullable|integer',
         ]);
 
-        $planIdBase = null;
-        if ($request->filled('plan_id_base')) {
-            $planIdBase = planes_cultivo::query()->whereKey((int) $request->plan_id_base)->value('id');
-        }
-
-        $import = new PlanesCultivoImport(
-            Auth::id(),
-            $planIdBase
-        );
+        $import = new PlanesCultivoImport(Auth::id());
 
         try {
             Excel::import($import, $request->file('archivo_excel'));
@@ -347,17 +345,9 @@ class PlanesCultivoController extends Controller
 
     public function descargarPlantillaImportacion()
     {
-        $contenido = implode("\n", [
-            'plan_id_base,cultivo_id,cultivo_codigo,cultivo_nombre,fecha_plan,semana,categoria,descripcion,cantidad_estimada,unidad_medida,costo_unitario',
-            ',3,CUL-0001,Maiz Amarillo,2026-04-21,1,Mano de Obra,Limpieza de terreno,3,Jornal,400',
-            ',3,CUL-0001,Maiz Amarillo,2026-04-21,1,Preparacion de Suelo,Arado mecanizado,1,Servicio,1800',
-            ',3,CUL-0001,Maiz Amarillo,2026-04-21,2,Fertilizante,Urea 46%,4,Kg,590',
-        ]);
+        $this->authorizeMassImports();
 
-        return response($contenido, 200, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="plantilla_planes_cultivo.csv"',
-        ]);
+        return Excel::download(new PlanesCultivoTemplateExport(), 'plantilla_planes_cultivo.xlsx');
     }
 
     private function obtenerCategoriasInsumos()
@@ -381,11 +371,9 @@ class PlanesCultivoController extends Controller
         }
 
         if (Schema::hasColumn('insumos', 'categoria_nombre')) {
-            $query = Insumo::query()->whereNotNull('categoria_nombre');
-
-            if (Schema::hasColumn('insumos', 'estado')) {
-                $query->where('estado', 1);
-            }
+            $query = Insumo::query()
+                ->activos()
+                ->whereNotNull('categoria_nombre');
 
             return $query
                 ->distinct()
@@ -426,13 +414,10 @@ class PlanesCultivoController extends Controller
     {
         if (Schema::hasColumn('insumos', 'categoria_id')) {
             $query = Insumo::query()
+                ->activos()
                 ->join('categorias', 'insumos.categoria_id', '=', 'categorias.id')
                 ->where('categorias.nombre', $categoria)
                 ->select('insumos.*');
-
-            if (Schema::hasColumn('insumos', 'estado')) {
-                $query->where('insumos.estado', 1);
-            }
 
             if (Schema::hasColumn('categorias', 'estado')) {
                 $query->where('categorias.estado', 1);
@@ -441,11 +426,9 @@ class PlanesCultivoController extends Controller
             return $query->orderBy('insumos.nombre')->get();
         }
 
-        $query = Insumo::query()->where('categoria_nombre', $categoria);
-
-        if (Schema::hasColumn('insumos', 'estado')) {
-            $query->where('estado', 1);
-        }
+        $query = Insumo::query()
+            ->activos()
+            ->where('categoria_nombre', $categoria);
 
         return $query->orderBy('nombre')->get();
     }
@@ -513,6 +496,13 @@ class PlanesCultivoController extends Controller
             ->values();
 
         return (int) ($semanasNormalizadas->min() ?: 1);
+    }
+
+    private function authorizeMassImports(): void
+    {
+        $user = Auth::user();
+
+        abort_unless($user instanceof \App\Models\User && $user->canManageMassImports(), 403);
     }
 
 }

@@ -85,7 +85,7 @@ class LotesReportController extends Controller
             ->when($request->filled('sucursal_id'), fn ($query) => $query->where('sucursal_id', $request->sucursal_id))
             ->when($request->filled('estado'), fn ($query) => $query->where('estado', $request->estado))
             ->orderBy('nombre')
-            ->get();
+            ->get(['id', 'codigo', 'nombre', 'sucursal_id', 'estado', 'area']);
 
         $cultivosPorLote = Cultivo::select(
             'lotes_id',

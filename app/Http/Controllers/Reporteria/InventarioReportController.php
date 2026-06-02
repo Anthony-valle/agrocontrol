@@ -106,6 +106,7 @@ class InventarioReportController extends Controller
     {
         if (Schema::hasColumn('insumos', 'categoria_nombre')) {
             return Insumo::query()
+                ->activos()
                 ->whereNotNull('categoria_nombre')
                 ->distinct()
                 ->orderBy('categoria_nombre')
@@ -114,7 +115,7 @@ class InventarioReportController extends Controller
 
         if (Schema::hasColumn('insumos', 'categoria_id')) {
             return Categorias::query()
-                ->whereIn('id', Insumo::query()->whereNotNull('categoria_id')->select('categoria_id'))
+                ->whereIn('id', Insumo::query()->activos()->whereNotNull('categoria_id')->select('categoria_id'))
                 ->orderBy('nombre')
                 ->pluck('nombre');
         }

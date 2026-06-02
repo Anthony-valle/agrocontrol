@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Bodega;
 use App\Traits\TracksDeletionMetadata;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -33,6 +34,13 @@ class User extends Authenticatable
         'super-administrador',
     ];
 
+    private const MASS_IMPORT_ROLES = [
+        'propietario',
+        'superadmin',
+        'super administrador',
+        'super-administrador',
+    ];
+
     protected $fillable = [
         'name',
         'nombre_completo',
@@ -42,6 +50,7 @@ class User extends Authenticatable
         'imagen_usuario',
         'estado',
         'sucursal_id',
+        'bodega_id_consumo',
         'rol_id',
         'access_permissions',
         'created_by',
@@ -64,27 +73,15 @@ class User extends Authenticatable
 
     public function getAccessPermissionsAttribute(mixed $value): array
     {
-        if (is_array($value)) {
-            return $value;
-        }
+        return $this->normalizeAccessPermissions($value);
+    }
 
-        if ($value === null || $value === '') {
-            return [];
-        }
-
-        if (is_string($value)) {
-            $decoded = json_decode($value, true);
-            if (is_array($decoded)) {
-                return $decoded;
-            }
-
-            $parts = array_values(array_filter(array_map('trim', explode(',', $value)), static fn ($item) => $item !== ''));
-            if ($parts !== []) {
-                return $parts;
-            }
-        }
-
-        return [];
+    public function setAccessPermissionsAttribute(mixed $value): void
+    {
+        $this->attributes['access_permissions'] = json_encode(
+            $this->normalizeAccessPermissions($value),
+            JSON_UNESCAPED_UNICODE
+        );
     }
 
     public function getImagenUsuarioUrlAttribute(): string
@@ -132,6 +129,11 @@ class User extends Authenticatable
         return $this->belongsTo(Sucursale::class);
     }
 
+    public function bodegaConsumo()
+    {
+        return $this->belongsTo(Bodega::class, 'bodega_id_consumo');
+    }
+
     public function rol()
     {
         return $this->belongsTo(Role::class);
@@ -174,6 +176,26 @@ class User extends Authenticatable
         return $this->hasAnyRole(self::SENSITIVE_ACTION_ROLES);
     }
 
+    public function canManageMassImports(): bool
+    {
+        return $this->hasAnyRole(self::MASS_IMPORT_ROLES);
+    }
+
+    public function isNotificador(): bool
+    {
+        return $this->hasRole('notificador');
+    }
+
+    public function hasAssignedConsumptionWarehouse(): bool
+    {
+        return ! empty($this->bodega_id_consumo);
+    }
+
+    public function requiresAssignedConsumptionWarehouse(): bool
+    {
+        return $this->isNotificador();
+    }
+
     public function hasAccess(string $permission): bool
     {
         // Roles con acceso global
@@ -193,6 +215,55 @@ class User extends Authenticatable
     private function normalizeRoleName(?string $role): string
     {
         return preg_replace('/[^a-z0-9]/', '', strtolower(trim((string) $role))) ?? '';
+    }
+
+    private function normalizeAccessPermissions(mixed $value): array
+    {
+        if (is_array($value)) {
+            return $this->sanitizeAccessPermissions($value);
+        }
+
+        if ($value === null || $value === '') {
+            return [];
+        }
+
+        if (is_string($value)) {
+            $decoded = json_decode($value, true);
+
+            if (is_array($decoded)) {
+                return $this->sanitizeAccessPermissions($decoded);
+            }
+
+            if (is_string($decoded)) {
+                return $this->normalizeAccessPermissions($decoded);
+            }
+
+            $trimmed = trim($value, " \t\n\r\0\x0B\"'");
+            if ($trimmed === '' || in_array($trimmed, ['[]', '{}', 'null'], true)) {
+                return [];
+            }
+
+            return $this->sanitizeAccessPermissions(explode(',', $trimmed));
+        }
+
+        return [];
+    }
+
+    private function sanitizeAccessPermissions(array $permissions): array
+    {
+        return array_values(array_unique(array_filter(array_map(function (mixed $permission) {
+            if (! is_string($permission)) {
+                return null;
+            }
+
+            $normalized = trim($permission, " \t\n\r\0\x0B\"'");
+
+            if ($normalized === '' || in_array($normalized, ['[]', '{}', 'null'], true)) {
+                return null;
+            }
+
+            return $normalized;
+        }, $permissions))));
     }
 }
 

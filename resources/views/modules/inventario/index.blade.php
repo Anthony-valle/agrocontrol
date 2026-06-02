@@ -26,12 +26,12 @@
 
 
             <!-- CONTROLES -->
-            <form method="GET" action="{{ route('inventarios.index') }}" class="d-flex flex-wrap justify-content-between align-items-center mb-3 p-2 bg-light rounded shadow-sm gap-3">
+            <form method="GET" action="{{ route('inventarios.index') }}" class="d-flex flex-wrap justify-content-between align-items-center mb-3 p-2 bg-light rounded shadow-sm gap-3 agro-table-toolbar">
 
-                <div class="d-flex align-items-center gap-3">
+                <div class="d-flex align-items-center gap-3 agro-table-toolbar-group">
 
-                    <div class="d-flex align-items-center gap-2">
-                        <select id="customPerPage" name="per_page" class="form-select form-select-sm" style="width:auto;">
+                    <div class="d-flex align-items-center gap-2 agro-toolbar-records">
+                        <select id="customPerPage" name="per_page" class="form-select form-select-sm agro-toolbar-select" style="width:auto;">
                             <option value="5" {{ (int) $perPage === 5 ? 'selected' : '' }}>5</option>
                             <option value="10" {{ (int) $perPage === 10 ? 'selected' : '' }}>10</option>
                             <option value="20" {{ (int) $perPage === 20 ? 'selected' : '' }}>20</option>
@@ -40,7 +40,7 @@
                         <small class="text-muted">registros</small>
                     </div>
 
-                    <div class="input-group input-group-sm">
+                    <div class="input-group input-group-sm agro-toolbar-search">
                         <span class="input-group-text bg-white">
                             <i class="fa-solid fa-magnifying-glass text-muted"></i>
                         </span>

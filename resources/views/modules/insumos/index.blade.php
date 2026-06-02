@@ -45,9 +45,11 @@
                                 <button type="button" class="btn btn-primary btn-sm shadow-sm" id="btnAbrirModal">
                                     <i class="fa-solid fa-circle-plus me-2"></i> Nuevo Insumo
                                 </button>
+                                @if(auth()->user()?->canManageMassImports())
                                 <button type="button" class="btn btn-success btn-sm shadow-sm" id="btnAbrirModalImportar">
                                     <i class="fa-solid fa-file-excel me-2"></i> Importar Excel
                                 </button>
+                                @endif
                             </div>
                         </div>
 
@@ -77,11 +79,41 @@
                                         <td>{{ $item->categoria_nombre_resuelto ?? 'Sin categoría' }}</td>
                                         <td>{{ $item->unidad_medida }}</td>
                                         <td>{{ $item->stock_minimo_resuelto ?? 0 }}</td>
-                                        <td>{{ ($item->estado_resuelto ?? true) ? 'Activo' : 'Inactivo' }}</td>
+                                        <td>
+                                            <span class="badge {{ ($item->estado_resuelto ?? true) ? 'bg-success' : 'bg-secondary' }}">
+                                                {{ ($item->estado_resuelto ?? true) ? 'Activo' : 'Inactivo' }}
+                                            </span>
+                                            @if(!($item->estado_resuelto ?? true) && !empty($item->bloqueo_motivo_resuelto))
+                                                <div class="small text-muted mt-1" title="{{ $item->bloqueo_motivo_resuelto }}">
+                                                    {{ \Illuminate\Support\Str::limit($item->bloqueo_motivo_resuelto, 70) }}
+                                                </div>
+                                            @endif
+                                        </td>
                                         <td class="text-center text-nowrap">
                                             <button class="btn btn-warning btn-sm btnEditarInsumos" data-id="{{ $item->id }}">
                                                 <i class="fa-solid fa-pen-to-square"></i>
                                             </button>
+                                            @if($item->estado_resuelto ?? true)
+                                            <button
+                                                class="btn btn-secondary btn-sm btnBloquearInsumo"
+                                                data-id="{{ $item->id }}"
+                                                data-estado="0"
+                                                data-nombre="{{ $item->nombre }}"
+                                                title="Bloquear insumo"
+                                            >
+                                                <i class="fa-solid fa-lock"></i>
+                                            </button>
+                                            @else
+                                            <button
+                                                class="btn btn-success btn-sm btnBloquearInsumo"
+                                                data-id="{{ $item->id }}"
+                                                data-estado="1"
+                                                data-nombre="{{ $item->nombre }}"
+                                                title="Reactivar insumo"
+                                            >
+                                                <i class="fa-solid fa-lock-open"></i>
+                                            </button>
+                                            @endif
                                             <button class="btn btn-danger btn-sm btnEliminarInsumos" data-id="{{ $item->id }}">
                                                 <i class="fa-solid fa-trash"></i>
                                             </button>
@@ -230,16 +262,20 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // MODAL IMPORTAR
-    document.getElementById('btnAbrirModalImportar').addEventListener('click', function() {
-        fetch("{{ route('insumos.importar') }}")
-            .then(response => response.text())
-            .then(html => {
-                document.getElementById('modalContentImportar').innerHTML = html;
-                new bootstrap.Modal(document.getElementById('modalImportar')).show();
-                bindAjaxForm('modalImportar', 'modalContentImportar', 'Insumos importados correctamente.');
-            })
-            .catch(error => console.error(error));
-    });
+    const btnAbrirModalImportar = document.getElementById('btnAbrirModalImportar');
+
+    if (btnAbrirModalImportar) {
+        btnAbrirModalImportar.addEventListener('click', function() {
+            fetch("{{ route('insumos.importar') }}")
+                .then(response => response.text())
+                .then(html => {
+                    document.getElementById('modalContentImportar').innerHTML = html;
+                    new bootstrap.Modal(document.getElementById('modalImportar')).show();
+                    bindAjaxForm('modalImportar', 'modalContentImportar', 'Insumos importados correctamente.');
+                })
+                .catch(error => console.error(error));
+        });
+    }
 
     // MODAL EDITAR Y ELIMINAR
     document.addEventListener('click', function (e) {
@@ -253,6 +289,105 @@ document.addEventListener("DOMContentLoaded", () => {
                     new bootstrap.Modal(document.getElementById('modalInsumosEdit')).show();
                     bindAjaxForm('modalInsumosEdit', 'modalContentEdit', 'Insumo actualizado correctamente.');
                 });
+        }
+
+        if (e.target.closest('.btnBloquearInsumo')) {
+            const button = e.target.closest('.btnBloquearInsumo');
+            const id = button.dataset.id;
+            const estado = button.dataset.estado;
+            const nombre = button.dataset.nombre || 'este insumo';
+
+            if (estado === '0') {
+                Swal.fire({
+                    title: 'Bloquear insumo',
+                    text: `Indica el motivo del bloqueo para ${nombre}.`,
+                    input: 'textarea',
+                    inputLabel: 'Motivo del bloqueo',
+                    inputPlaceholder: 'Ejemplo: creado por error, duplicado, información incorrecta...',
+                    inputAttributes: {
+                        maxlength: 1000,
+                    },
+                    showCancelButton: true,
+                    confirmButtonText: 'Bloquear',
+                    cancelButtonText: 'Cancelar',
+                    confirmButtonColor: '#6c757d',
+                    preConfirm: (value) => {
+                        if (!value || !value.trim()) {
+                            Swal.showValidationMessage('Debes escribir el motivo del bloqueo.');
+                            return false;
+                        }
+
+                        return value.trim();
+                    }
+                }).then((result) => {
+                    if (!result.isConfirmed) {
+                        return;
+                    }
+
+                    fetch(`/insumos/${id}/estado`, {
+                        method: 'PATCH',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            estado: 0,
+                            motivo: result.value
+                        })
+                    })
+                        .then(async response => {
+                            const data = await response.json().catch(() => ({}));
+                            if (!response.ok) throw data;
+                            return data;
+                        })
+                        .then(data => {
+                            Swal.fire('Éxito', data.success || 'Insumo bloqueado correctamente.', 'success').then(() => location.reload());
+                        })
+                        .catch(mostrarErrores);
+                });
+
+                return;
+            }
+
+            Swal.fire({
+                title: '¿Reactivar insumo?',
+                text: `El insumo ${nombre} volverá a mostrarse en las demás operaciones del sistema.`,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Reactivar',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#198754',
+            }).then((result) => {
+                if (!result.isConfirmed) {
+                    return;
+                }
+
+                fetch(`/insumos/${id}/estado`, {
+                    method: 'PATCH',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ estado: 1 })
+                })
+                    .then(async response => {
+                        const data = await response.json().catch(() => ({}));
+                        if (!response.ok) throw data;
+                        return data;
+                    })
+                    .then(data => {
+                        Swal.fire('Éxito', data.success || 'Insumo reactivado correctamente.', 'success').then(() => location.reload());
+                    })
+                    .catch(mostrarErrores);
+            });
+
+            return;
         }
 
         // Eliminar

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Bodega;
 use App\Models\Role;
 use App\Models\Sucursale;
 use App\Models\User;
@@ -47,9 +48,11 @@ class UserController extends Controller
                 ->get();
         }
 
+        $bodegas = $this->availableConsumptionWarehouses($currentUser);
+
         $accessOptions = $this->accessOptions();
 
-        return view('modules.usuarios.create', compact('roles', 'sucursales', 'accessOptions'));
+        return view('modules.usuarios.create', compact('roles', 'sucursales', 'bodegas', 'accessOptions'));
     }
 
     // Método para obtener sucursales vía AJAX (Ruta: /get-sucursales/{id})
@@ -75,6 +78,7 @@ class UserController extends Controller
                 'password'        => 'required|min:6|confirmed',
                 'rol_id'          => 'required|exists:roles,id',
                 'sucursal_id'     => 'required|exists:sucursales,id',
+                'bodega_id_consumo' => 'nullable|exists:bodegas,id',
                 'estado'          => 'required|in:0,1',
                 'imagen_usuario'  => 'nullable|image|max:2048',
                 'access_permissions' => 'nullable|array',
@@ -109,6 +113,14 @@ class UserController extends Controller
                 $validated['sucursal_id'] = $currentUser->sucursal_id;
             }
 
+            $rolSeleccionado = Role::findOrFail((int) $validated['rol_id']);
+            $validated['bodega_id_consumo'] = $this->resolveAssignedWarehouseValue(
+                $request->input('bodega_id_consumo'),
+                $rolSeleccionado,
+                $validated['sucursal_id'] ?? null,
+                $currentUser
+            );
+
             $resolvedEmail = $this->resolveUserEmail(
                 $validated['email'] ?? null,
                 $validated['usuario'],
@@ -122,6 +134,7 @@ class UserController extends Controller
                 'password'        => Hash::make($validated['password']),
                 'rol_id'          => $validated['rol_id'],
                 'sucursal_id'     => $validated['sucursal_id'],
+                'bodega_id_consumo' => $validated['bodega_id_consumo'],
                 'access_permissions' => $validated['access_permissions'] ?? [],
                 'imagen_usuario'  => $request->file('imagen_usuario')?->store('usuarios', 'public'),
                 'estado'          => (bool) $validated['estado'],
@@ -159,9 +172,11 @@ class UserController extends Controller
                 ->get();
         }
 
+        $bodegas = $this->availableConsumptionWarehouses($currentUser);
+
         $accessOptions = $this->accessOptions();
 
-        return view('modules.usuarios.edit', compact('user', 'roles', 'sucursales', 'accessOptions'));
+        return view('modules.usuarios.edit', compact('user', 'roles', 'sucursales', 'bodegas', 'accessOptions'));
     }
 
     // Actualizar usuario
@@ -175,6 +190,7 @@ class UserController extends Controller
                 'password'        => 'nullable|min:6|confirmed',
                 'rol_id'          => 'required|exists:roles,id',
                 'sucursal_id'     => 'required|exists:sucursales,id',
+                'bodega_id_consumo' => 'nullable|exists:bodegas,id',
                 'estado'          => 'required|in:0,1',
                 'imagen_usuario'  => 'nullable|image|max:2048',
                 'access_permissions' => 'nullable|array',
@@ -208,6 +224,14 @@ class UserController extends Controller
                 $validated['sucursal_id'] = $currentUser->sucursal_id;
             }
 
+            $rolSeleccionado = Role::findOrFail((int) $validated['rol_id']);
+            $validated['bodega_id_consumo'] = $this->resolveAssignedWarehouseValue(
+                $request->input('bodega_id_consumo'),
+                $rolSeleccionado,
+                $validated['sucursal_id'] ?? null,
+                $currentUser
+            );
+
             $resolvedEmail = $this->resolveUserEmail(
                 $validated['email'] ?? $user->email,
                 $validated['usuario'],
@@ -221,6 +245,7 @@ class UserController extends Controller
                 'usuario'         => $validated['usuario'],
                 'rol_id'          => $validated['rol_id'],
                 'sucursal_id'     => $validated['sucursal_id'],
+                'bodega_id_consumo' => $validated['bodega_id_consumo'],
                 'access_permissions' => $validated['access_permissions'] ?? [],
                 'estado'          => (bool) $validated['estado'],
                 'updated_by'      => Auth::id(),
@@ -303,7 +328,7 @@ class UserController extends Controller
 
     private function accessOptions(): array
     {
-        return [
+        $labels = [
             'empresas' => 'Empresas',
             'sucursales' => 'Sucursales',
             'bodegas' => 'Bodegas',
@@ -318,9 +343,81 @@ class UserController extends Controller
             'traslado' => 'Traslado Almacén',
             'ajuste' => 'Ajuste Inventario',
             'inventarios' => 'Inventarios',
+            'compras' => 'Compras / Solicitudes',
             'roles' => 'Roles',
             'usuarios' => 'Usuarios',
         ];
+
+        $permissions = collect(array_keys($labels))
+            ->merge($this->discoverSidebarPermissions())
+            ->merge($this->discoverPersistedPermissions())
+            ->map(fn (mixed $permission) => $this->normalizePermissionToken($permission))
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values();
+
+        return $permissions
+            ->mapWithKeys(fn (string $permission) => [
+                $permission => $labels[$permission] ?? $this->formatPermissionLabel($permission),
+            ])
+            ->all();
+    }
+
+    private function discoverSidebarPermissions(): array
+    {
+        $sidebarPath = resource_path('views/shared/aside.blade.php');
+        if (! is_file($sidebarPath)) {
+            return [];
+        }
+
+        $contents = file_get_contents($sidebarPath);
+        if ($contents === false) {
+            return [];
+        }
+
+        preg_match_all("/hasAccess\('([^']+)'\)/", $contents, $matches);
+
+        return $matches[1] ?? [];
+    }
+
+    private function discoverPersistedPermissions(): array
+    {
+        return User::query()
+            ->get(['access_permissions'])
+            ->flatMap(function (User $user) {
+                return $user->access_permissions ?? [];
+            })
+            ->map(fn (mixed $permission) => $this->normalizePermissionToken($permission))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function normalizePermissionToken(mixed $permission): ?string
+    {
+        if (! is_string($permission)) {
+            return null;
+        }
+
+        $normalized = trim($permission);
+        if ($normalized === '') {
+            return null;
+        }
+
+        if (in_array($normalized, ['[]', '[""]', "['']", '{}', 'null'], true)) {
+            return null;
+        }
+
+        return $normalized;
+    }
+
+    private function formatPermissionLabel(string $permission): string
+    {
+        $normalized = str_replace(['_', '-'], ' ', $permission);
+
+        return Str::headline($normalized);
     }
 
     private function filterPersistedColumns(string $table, array $payload): array
@@ -328,6 +425,58 @@ class UserController extends Controller
         $availableColumns = array_flip(Schema::getColumnListing($table));
 
         return array_intersect_key($payload, $availableColumns);
+    }
+
+    private function availableConsumptionWarehouses(?User $currentUser)
+    {
+        return Bodega::query()
+            ->when(
+                Schema::hasColumn('bodegas', 'estado'),
+                fn ($query) => $query->where('estado', 1)
+            )
+            ->when(
+                $currentUser && ! $currentUser->isSuperUser(),
+                fn ($query) => $query->where('sucursal_id', $currentUser->sucursal_id)
+            )
+            ->orderBy('nombre')
+            ->get(['id', 'nombre', 'sucursal_id']);
+    }
+
+    private function resolveAssignedWarehouseValue(mixed $warehouseId, Role $rol, mixed $sucursalId, ?User $currentUser): ?int
+    {
+        $normalizedRole = preg_replace('/[^a-z0-9]/', '', strtolower(trim((string) $rol->nombre))) ?? '';
+        $requiresWarehouse = $normalizedRole === 'notificador';
+        $warehouseId = filled($warehouseId) ? (int) $warehouseId : null;
+
+        if ($requiresWarehouse && ! $warehouseId) {
+            abort(response()->json([
+                'errors' => ['bodega_id_consumo' => ['Debes asignar una bodega de consumo al usuario notificador.']],
+            ], 422));
+        }
+
+        if (! $warehouseId) {
+            return null;
+        }
+
+        $bodegaQuery = Bodega::query()->whereKey($warehouseId);
+
+        if ($currentUser && ! $currentUser->isSuperUser()) {
+            $bodegaQuery->where('sucursal_id', $currentUser->sucursal_id);
+        }
+
+        if ($sucursalId !== null) {
+            $bodegaQuery->where('sucursal_id', $sucursalId);
+        }
+
+        $bodega = $bodegaQuery->first();
+
+        if (! $bodega) {
+            abort(response()->json([
+                'errors' => ['bodega_id_consumo' => ['La bodega asignada no pertenece a la sucursal seleccionada o no está disponible.']],
+            ], 422));
+        }
+
+        return (int) $bodega->id;
     }
 
     private function resolveUserEmail(?string $email, string $usuario, ?int $ignoreUserId = null): string

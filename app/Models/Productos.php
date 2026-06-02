@@ -32,7 +32,7 @@ class Productos extends Model
         protected $casts = [
         'stock_actual'   => 'decimal:3',
         'stock_minimo'   => 'decimal:3',
-        'precio_unitario'=> 'decimal:2',
+        'precio_unitario'=> 'decimal:3',
         'ind_activo'     => 'boolean',
     ];
 
@@ -69,6 +69,6 @@ class Productos extends Model
     // Precio con moneda
     public function getPrecioFormateadoAttribute()
     {
-        return agro_number($this->precio_unitario, 2) . ' ' . $this->moneda;
+        return agro_number($this->precio_unitario, 3) . ' ' . $this->moneda;
     }
 }

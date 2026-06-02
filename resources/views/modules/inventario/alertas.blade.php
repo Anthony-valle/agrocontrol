@@ -27,8 +27,8 @@
                 <div class="d-flex flex-column flex-lg-row align-items-stretch align-items-lg-center gap-2 grow">
 
                     <!-- REGISTROS -->
-                    <div class="d-flex align-items-center gap-2 shrink-0">
-                        <select id="customPerPage" class="form-select form-select-sm" style="width:auto;">
+                    <div class="d-flex align-items-center gap-2 shrink-0 agro-toolbar-records">
+                        <select id="customPerPage" class="form-select form-select-sm agro-toolbar-select" style="width:auto;">
                             <option value="5">5</option>
                             <option value="10" selected>10</option>
                             <option value="20">20</option>

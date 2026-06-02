@@ -137,8 +137,8 @@ class ConsumosCategoriaSheet implements FromArray, ShouldAutoSize, WithDrawings,
                 ]);
 
                 $sheet->getStyle('H4:J' . $totalRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-                $sheet->getStyle('H4:H' . $totalRow)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER_00);
-                $sheet->getStyle('J4:J' . $totalRow)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER_00);
+                $sheet->getStyle('H4:H' . $totalRow)->getNumberFormat()->setFormatCode('#,##0.000');
+                $sheet->getStyle('J4:J' . $totalRow)->getNumberFormat()->setFormatCode('#,##0.000');
                 $sheet->getStyle('A1:J2')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
                 $sheet->getStyle('B1:J1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
                 $sheet->getStyle('B2:J2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);

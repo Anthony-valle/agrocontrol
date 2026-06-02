@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\ConsumosTemplateExport;
+use App\Imports\ConsumosImport;
 use App\Models\Consumo;
 use App\Models\Consumo_detalles;
 use App\Models\Categorias;
@@ -17,6 +19,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ConsumoController extends Controller
 {
@@ -53,6 +57,45 @@ class ConsumoController extends Controller
         return view('modules.consumo.index', compact('consumos', 'notificaciones', 'cultivos'));
     }
 
+    public function importar(Request $request)
+    {
+        $this->authorizeMassImports();
+
+        $request->validate([
+            'archivo_excel' => 'required|file|mimes:xlsx,xls,csv',
+        ]);
+
+        $import = new ConsumosImport(Auth::id(), $this->inventarioService);
+
+        try {
+            Excel::import($import, $request->file('archivo_excel'));
+
+            $stats = $import->getStats();
+            $errores = $import->getErrores();
+            $summaryHtml = $this->buildImportSummaryHtml($import->getSummaryLines(), $errores);
+
+            if (($stats['consumos_creados'] ?? 0) === 0) {
+                return $this->responderImportacion(
+                    $request,
+                    422,
+                    $this->buildImportFailureMessage($errores),
+                    $summaryHtml
+                );
+            }
+
+            return $this->responderImportacion($request, 200, 'Carga masiva de consumos completada correctamente.', $summaryHtml, true);
+        } catch (\Throwable $error) {
+            return $this->responderImportacion($request, 422, $this->resolverMensajeErrorImportacion($request, $error));
+        }
+    }
+
+    public function descargarPlantillaImportacion()
+    {
+        $this->authorizeMassImports();
+
+        return Excel::download(new ConsumosTemplateExport(), 'plantilla_consumos_historicos.xlsx');
+    }
+
     /** Formulario para crear un consumo */
     public function create()
     {
@@ -61,7 +104,10 @@ class ConsumoController extends Controller
         $insumos = $this->obtenerInsumosParaConsumo();
         $labores = $this->obtenerLaboresParaConsumo();
 
-        return view('modules.consumo.create', compact('cultivos','insumos','labores'));
+        $assignedConsumptionWarehouse = $this->assignedConsumptionWarehouseForCurrentUser();
+        $requiresAssignedConsumptionWarehouse = $this->currentUserRequiresAssignedWarehouse();
+
+        return view('modules.consumo.create', compact('cultivos','insumos','labores', 'assignedConsumptionWarehouse', 'requiresAssignedConsumptionWarehouse'));
     }
 
     /** Guardar un consumo */
@@ -76,6 +122,8 @@ class ConsumoController extends Controller
         DB::beginTransaction();
         try {
             $cultivo = Cultivo::findOrFail($request->cultivo_id);
+
+            $this->ensureItemsRespectAssignedWarehouse($request->input('items', []));
 
             if (strtolower($cultivo->estado) === 'cerrado') {
                 return back()->with('error', 'No se puede registrar consumo en un cultivo cerrado.');
@@ -167,6 +215,8 @@ class ConsumoController extends Controller
 
         $insumos = $this->obtenerInsumosParaConsumo();
         $labores = $this->obtenerLaboresParaConsumo();
+        $assignedConsumptionWarehouse = $this->assignedConsumptionWarehouseForCurrentUser();
+        $requiresAssignedConsumptionWarehouse = $this->currentUserRequiresAssignedWarehouse();
 
         $consumo->load('detalles');
 
@@ -191,6 +241,8 @@ class ConsumoController extends Controller
             'consumo' => $consumo,
             'detallesIniciales' => $detallesIniciales,
             'modoEdicion' => true,
+            'assignedConsumptionWarehouse' => $assignedConsumptionWarehouse,
+            'requiresAssignedConsumptionWarehouse' => $requiresAssignedConsumptionWarehouse,
         ]);
     }
 
@@ -206,6 +258,8 @@ class ConsumoController extends Controller
 
         try {
             $cultivo = Cultivo::findOrFail($request->cultivo_id);
+
+            $this->ensureItemsRespectAssignedWarehouse($request->input('items', []));
 
             if (strtolower((string) $cultivo->estado) === 'cerrado') {
                 return back()->with('error', 'No se puede registrar consumo en un cultivo cerrado.');
@@ -317,6 +371,10 @@ class ConsumoController extends Controller
         $inventarios = InventarioBodega::with('bodega')
             ->where('insumo_id', $insumo_id)
             ->where('stock_actual', '>', 0)
+            ->when(
+                $this->assignedConsumptionWarehouseIdForCurrentUser() !== null,
+                fn ($query) => $query->where('bodega_id', $this->assignedConsumptionWarehouseIdForCurrentUser())
+            )
             ->get();
 
         return response()->json($inventarios->map(function($inv){
@@ -353,6 +411,134 @@ class ConsumoController extends Controller
         }
 
         return redirect()->route('consumo.show', $consumo)->with('success', 'Consumo finalizado correctamente.');
+    }
+
+    public function anular(Request $request, Consumo $consumo)
+    {
+        $validated = $request->validate([
+            'motivo_anulacion' => 'required|string|max:255',
+        ]);
+
+        $estadoActual = $consumo->estado_normalizado;
+
+        if ($estadoActual === 'ANULADO') {
+            if ($request->ajax() || $request->expectsJson()) {
+                return response()->json(['info' => 'El consumo ya se encuentra anulado.'], 200);
+            }
+
+            return redirect()->route('consumo.index')->with('info', 'El consumo ya se encuentra anulado.');
+        }
+
+        try {
+            DB::transaction(function () use ($consumo, $estadoActual, $validated) {
+                if ($estadoActual === 'FINALIZADO') {
+                    $this->inventarioService->revertirStockDeConsumo($consumo);
+                    $this->inventarioService->eliminarMovimientosDeConsumo($consumo->id);
+                }
+
+                $consumo->update([
+                    'estado' => 'ANULADO',
+                    'anulado_by' => Auth::id(),
+                    'fecha_anulacion' => now(),
+                    'motivo_anulacion' => $validated['motivo_anulacion'],
+                    'updated_by' => Auth::id(),
+                ]);
+
+                $this->ocultarConsumoAnulado($consumo, $validated['motivo_anulacion']);
+            });
+
+            if ($request->ajax() || $request->expectsJson()) {
+                return response()->json(['success' => 'Consumo anulado correctamente y ocultado del listado.'], 200);
+            }
+
+            return redirect()->route('consumo.index')->with('success', 'Consumo anulado correctamente y ocultado del listado.');
+        } catch (\Throwable $error) {
+            if ($request->ajax() || $request->expectsJson()) {
+                return response()->json(['message' => 'Error al anular el consumo: ' . $error->getMessage()], 422);
+            }
+
+            return redirect()->route('consumo.index')->with('error', 'Error al anular el consumo: ' . $error->getMessage());
+        }
+    }
+
+    public function anularPorCultivo(Request $request, Cultivo $cultivo)
+    {
+        $validated = $request->validate([
+            'motivo_anulacion' => 'required|string|max:255',
+        ]);
+
+        $consumos = Consumo::query()
+            ->where('cultivo_id', $cultivo->id)
+            ->whereNull('deleted_at')
+            ->with('detalles')
+            ->get()
+            ->reject(fn (Consumo $consumo) => $consumo->estado_normalizado === 'ANULADO')
+            ->values();
+
+        if ($consumos->isEmpty()) {
+            if ($request->ajax() || $request->expectsJson()) {
+                return response()->json(['info' => 'No hay consumos activos para anular en el cultivo seleccionado.'], 200);
+            }
+
+            return redirect()->route('consumo.index')->with('info', 'No hay consumos activos para anular en el cultivo seleccionado.');
+        }
+
+        try {
+            DB::transaction(function () use ($consumos, $validated) {
+                foreach ($consumos as $consumo) {
+                    if ($consumo->estado_normalizado === 'FINALIZADO') {
+                        $this->inventarioService->revertirStockDeConsumo($consumo);
+                        $this->inventarioService->eliminarMovimientosDeConsumo($consumo->id);
+                    }
+
+                    $consumo->update([
+                        'estado' => 'ANULADO',
+                        'anulado_by' => Auth::id(),
+                        'fecha_anulacion' => now(),
+                        'motivo_anulacion' => $validated['motivo_anulacion'],
+                        'updated_by' => Auth::id(),
+                    ]);
+
+                    $this->ocultarConsumoAnulado($consumo, $validated['motivo_anulacion']);
+                }
+            });
+
+            $cantidad = $consumos->count();
+            $mensaje = 'Se anularon ' . $cantidad . ' consumos del cultivo ' . ($cultivo->nombre ?: ('#' . $cultivo->id)) . '.';
+
+            if ($request->ajax() || $request->expectsJson()) {
+                return response()->json(['success' => $mensaje], 200);
+            }
+
+            return redirect()->route('consumo.index')->with('success', $mensaje);
+        } catch (\Throwable $error) {
+            if ($request->ajax() || $request->expectsJson()) {
+                return response()->json(['message' => 'Error al anular los consumos del cultivo: ' . $error->getMessage()], 422);
+            }
+
+            return redirect()->route('consumo.index')->with('error', 'Error al anular los consumos del cultivo: ' . $error->getMessage());
+        }
+    }
+
+    private function ocultarConsumoAnulado(Consumo $consumo, string $motivo): void
+    {
+        $consumo->loadMissing('detalles');
+
+        foreach ($consumo->detalles as $detalle) {
+            $detalle->forceFill([
+                'deleted_by' => Auth::id(),
+                'delete_reason' => $motivo,
+            ]);
+            $detalle->saveQuietly();
+            $detalle->delete();
+        }
+
+        $consumo->forceFill([
+            'deleted_by' => Auth::id(),
+            'delete_reason' => $motivo,
+        ]);
+        $consumo->saveQuietly();
+        $consumo->delete();
     }
 
     public function destroy(Consumo $consumo)
@@ -392,10 +578,16 @@ class ConsumoController extends Controller
             $columnas[] = 'categoria_id';
         }
 
-        $query = Insumo::query()->select($columnas);
+        $query = Insumo::query()
+            ->activos()
+            ->select($columnas);
 
-        if (Schema::hasColumn('insumos', 'estado')) {
-            $query->where('estado', 1);
+        $assignedWarehouseId = $this->assignedConsumptionWarehouseIdForCurrentUser();
+        if ($assignedWarehouseId !== null) {
+            $query->whereHas('inventarioBodegas', function ($inventarioQuery) use ($assignedWarehouseId) {
+                $inventarioQuery->where('bodega_id', $assignedWarehouseId)
+                    ->where('stock_actual', '>', 0);
+            });
         }
 
         $insumos = $query->orderBy('nombre')->get();
@@ -497,5 +689,132 @@ class ConsumoController extends Controller
         }
 
         return $query->orderBy('nombre')->get();
+    }
+
+    private function resolverMensajeErrorImportacion(Request $request, \Throwable $error): string
+    {
+        $mensaje = $error->getMessage();
+        $extension = strtolower((string) $request->file('archivo_excel')?->getClientOriginalExtension());
+
+        if (Str::contains($mensaje, 'ZipArchive') && in_array($extension, ['xlsx', 'xls'], true)) {
+            return 'El servidor no tiene habilitada la extension ZIP de PHP para leer archivos Excel. Mientras se habilita, importa la plantilla en formato CSV o reinicia PHP despues de activar extension=zip en php.ini.';
+        }
+
+        return 'Error al importar el archivo: ' . $mensaje;
+    }
+
+    private function responderImportacion(Request $request, int $status, string $message, ?string $summaryHtml = null, bool $success = false)
+    {
+        if ($request->ajax() || $request->expectsJson()) {
+            return response()->json(array_filter([
+                $success ? 'success' : 'message' => $message,
+                'summary_html' => $summaryHtml,
+                'redirect' => $success ? route('consumo.index') : null,
+            ], fn ($value) => $value !== null), $status);
+        }
+
+        return redirect()
+            ->route('consumo.index')
+            ->with($success ? 'success' : 'error', $message)
+            ->with('import_summary_html', $summaryHtml);
+    }
+
+    private function buildImportSummaryHtml(array $summaryLines, array $errores = []): string
+    {
+        $html = '<ul class="text-start ps-3 mb-2">';
+
+        foreach ($summaryLines as $line) {
+            $html .= '<li>' . e($line) . '</li>';
+        }
+
+        $html .= '</ul>';
+
+        if (! empty($errores)) {
+            $html .= '<div class="mt-3"><b>Errores detectados:</b><ul class="text-start ps-3 mb-0">';
+            foreach ($errores as $error) {
+                $html .= '<li>' . e($error) . '</li>';
+            }
+            $html .= '</ul></div>';
+        }
+
+        return $html;
+    }
+
+    private function buildImportFailureMessage(array $errores = []): string
+    {
+        if (empty($errores)) {
+            return 'No se importo ningun consumo. Revisa el archivo e intenta de nuevo.';
+        }
+
+        $primerError = trim((string) ($errores[0] ?? ''));
+
+        return $primerError !== ''
+            ? 'No se importo ningun consumo. ' . $primerError
+            : 'No se importo ningun consumo. Revisa el archivo e intenta de nuevo.';
+    }
+
+    private function authorizeMassImports(): void
+    {
+        $user = Auth::user();
+
+        abort_unless($user instanceof \App\Models\User && $user->canManageMassImports(), 403);
+    }
+
+    private function currentUserRequiresAssignedWarehouse(): bool
+    {
+        $user = Auth::user();
+
+        return $user instanceof \App\Models\User && $user->requiresAssignedConsumptionWarehouse();
+    }
+
+    private function assignedConsumptionWarehouseForCurrentUser(): ?array
+    {
+        $user = Auth::user();
+
+        if (! $user instanceof \App\Models\User) {
+            return null;
+        }
+
+        $user->loadMissing('bodegaConsumo');
+
+        if (! $user->bodegaConsumo) {
+            return null;
+        }
+
+        return [
+            'id' => (int) $user->bodegaConsumo->id,
+            'nombre' => (string) $user->bodegaConsumo->nombre,
+        ];
+    }
+
+    private function assignedConsumptionWarehouseIdForCurrentUser(): ?int
+    {
+        if (! $this->currentUserRequiresAssignedWarehouse()) {
+            return null;
+        }
+
+        $warehouse = $this->assignedConsumptionWarehouseForCurrentUser();
+
+        return isset($warehouse['id']) ? (int) $warehouse['id'] : null;
+    }
+
+    private function ensureItemsRespectAssignedWarehouse(array $items): void
+    {
+        if (! $this->currentUserRequiresAssignedWarehouse()) {
+            return;
+        }
+
+        $assignedWarehouse = $this->assignedConsumptionWarehouseForCurrentUser();
+        if (! $assignedWarehouse) {
+            throw new \RuntimeException('Tu usuario notificador no tiene una bodega asignada para consumo.');
+        }
+
+        foreach ($items as $item) {
+            $itemWarehouseId = isset($item['bodega_id']) && $item['bodega_id'] !== '' ? (int) $item['bodega_id'] : null;
+
+            if ($itemWarehouseId !== null && $itemWarehouseId !== (int) $assignedWarehouse['id']) {
+                throw new \RuntimeException('Solo puedes consumir desde tu bodega asignada: ' . $assignedWarehouse['nombre'] . '.');
+            }
+        }
     }
 }

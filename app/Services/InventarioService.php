@@ -60,6 +60,8 @@ class InventarioService
                     continue;
                 }
 
+                $this->validateAssignedWarehouseAccess((int) $item['bodega_id']);
+
                 $inventario = $this->buscarInventarioPorLote($insumoId, (int) $item['bodega_id'], $lote);
 
                 if (!$inventario) {
@@ -236,5 +238,25 @@ class InventarioService
         }
 
         return $texto;
+    }
+
+    private function validateAssignedWarehouseAccess(int $bodegaId): void
+    {
+        $user = Auth::user();
+
+        if (! $user instanceof \App\Models\User || ! $user->requiresAssignedConsumptionWarehouse()) {
+            return;
+        }
+
+        if (! $user->hasAssignedConsumptionWarehouse()) {
+            throw new \RuntimeException('Tu usuario notificador no tiene una bodega asignada para consumo.');
+        }
+
+        if ((int) $user->bodega_id_consumo !== $bodegaId) {
+            $user->loadMissing('bodegaConsumo');
+            $nombreBodega = $user->bodegaConsumo?->nombre ?: 'la bodega asignada';
+
+            throw new \RuntimeException('Solo puedes consumir desde tu bodega asignada: ' . $nombreBodega . '.');
+        }
     }
 }

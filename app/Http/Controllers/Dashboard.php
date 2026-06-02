@@ -14,37 +14,33 @@ class Dashboard extends Controller
     {
         $cultivosActivos = Cultivo::latest('id')
             ->take(5)
-            ->get($this->selectExistingColumns('cultivos', ['nombre', 'codigo']));
+            ->get($this->selectExistingColumns('cultivos', ['id', 'nombre', 'codigo']));
 
         $lotesActivos = Lote::latest('id')
             ->take(5)
-            ->get($this->selectExistingColumns('lotes', ['nombre', 'codigo']));
+            ->get($this->selectExistingColumns('lotes', ['id', 'nombre', 'codigo']));
 
-        $insumosTotales = Insumo::count();
-
-        $listaInsumos = Insumo::withSum('inventarioBodegas as stock_total', 'stock_actual')
-            ->orderBy('nombre')
-            ->take(8)
-            ->get(['id', 'nombre', 'stock_minimo']);
-
-        $insumosBajoStock = Insumo::withSum('inventarioBodegas as stock_total', 'stock_actual')
-            ->get(['id', 'nombre', 'stock_minimo'])
-            ->filter(function ($insumo) {
-                return (float) ($insumo->stock_total ?? 0) <= (float) ($insumo->stock_minimo ?? 0);
-            })
-            ->sortBy('stock_total')
-            ->values();
+        $insumosTotales = Insumo::query()->activos()->count();
 
         $totalCultivos = Cultivo::count();
         $totalLotes = Lote::count();
-        $alertasStock = $insumosBajoStock->count();
+        $alertasStock = 0;
+        $stockThresholdColumn = collect(['stock_minimo', 'stock_min', 'minimo'])
+            ->first(fn (string $column) => Schema::hasColumn('insumos', $column));
+
+        if ($stockThresholdColumn) {
+            $alertasStock = Insumo::query()
+                ->activos()
+                ->select(['id', $stockThresholdColumn])
+                ->withSum('inventarioBodegas as stock_total', 'stock_actual')
+                ->havingRaw("COALESCE(stock_total, 0) <= COALESCE({$stockThresholdColumn}, 0)")
+                ->count();
+        }
 
         return view('modules.dashboard.home', compact(
             'cultivosActivos',
             'lotesActivos',
             'insumosTotales',
-            'listaInsumos',
-            'insumosBajoStock',
             'totalCultivos',
             'totalLotes',
             'alertasStock'

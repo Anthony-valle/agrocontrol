@@ -50,9 +50,9 @@
                 <tr>
                     <th>Insumo</th>
                     <th>Categoría</th>
-                    <th>Descripción</th>
                     <th class="text-end">Cantidad</th>
                     <th class="text-center">U.M.</th>
+                    <th class="text-end">Precio unitario</th>
                     <th class="text-end">Subtotal</th>
                 </tr>
             </thead>
@@ -70,9 +70,9 @@
                     >
                         <td>{{ $insumoTexto }}</td>
                         <td>{{ $item->categoria }}</td>
-                        <td>{{ $item->descripcion }}</td>
                         <td class="text-end">{{ agro_number($item->cantidad, 2) }}</td>
                         <td class="text-center">{{ $item->unidad_medida }}</td>
+                        <td class="text-end">{{ agro_number($item->costo_unitario, 2) }}</td>
                         <td class="text-end">{{ agro_number($item->subtotal, 2) }}</td>
                     </tr>
                 @endforeach

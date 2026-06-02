@@ -88,7 +88,7 @@ class PreparacionSueloController extends Controller
 			foreach ($cultivos as $cultivo) {
 				$hectareas = (float) ($cultivo->hectareas ?? 0);
 				$costoUnitario = (float) $validated['costo_unitario'];
-				$subtotal = round($hectareas * $costoUnitario, 2);
+				$subtotal = round($hectareas * $costoUnitario, 3);
 
 				$consumo = Consumo::create($this->filtrarColumnasPersistidas('consumos', [
 					'empresa_id' => $cultivo->empresa_id,
@@ -168,7 +168,7 @@ class PreparacionSueloController extends Controller
 		$detalle = $this->obtenerDetallePreparacion($consumo);
 		$hectareas = (float) ($consumo->cultivo?->hectareas ?? $detalle?->cantidad ?? 0);
 		$costoUnitario = (float) $validated['costo_unitario'];
-		$subtotal = round($hectareas * $costoUnitario, 2);
+		$subtotal = round($hectareas * $costoUnitario, 3);
 
 		DB::transaction(function () use ($consumo, $detalle, $validated, $hectareas, $costoUnitario, $subtotal) {
 			$consumo->update($this->filtrarColumnasPersistidas('consumos', [

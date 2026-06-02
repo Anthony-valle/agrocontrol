@@ -28,17 +28,27 @@ class NotificacionesController extends Controller
     {
         $search = trim((string) request('search', ''));
         $perPage = (int) request('per_page', 15);
+        $sort = trim((string) request('sort', 'recentes'));
         if (!in_array($perPage, [5, 10, 15, 20, 50], true)) {
             $perPage = 15;
         }
 
+        if (!in_array($sort, ['recentes', 'antiguas'], true)) {
+            $sort = 'recentes';
+        }
+
         /** @var \App\Models\User|null $user */
         $user = Auth::user();
-        abort_unless($user && $user->isSuperUser(), 403);
+        abort_unless($user && ($user->isSuperUser() || $user->hasRole('compra')), 403);
 
         $query = Notificaciones::with(['usuario', 'cultivo'])
-            ->where('user_id', $user->id)
-            ->orderByDesc('created_at');
+            ->where('user_id', $user->id);
+
+        if ($sort === 'antiguas') {
+            $query->orderBy('created_at')->orderBy('id');
+        } else {
+            $query->orderByDesc('created_at')->orderByDesc('id');
+        }
 
         if ($search !== '') {
             $query->where(function ($builder) use ($search) {
@@ -76,7 +86,7 @@ class NotificacionesController extends Controller
             ->sortByDesc('total')
             ->values();
 
-        return view('modules.notificaciones.index', compact('notificaciones', 'search', 'perPage', 'resumenTipos'));
+        return view('modules.notificaciones.index', compact('notificaciones', 'search', 'perPage', 'resumenTipos', 'sort'));
     }
 
     /**

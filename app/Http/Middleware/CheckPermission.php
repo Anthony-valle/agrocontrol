@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\User;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -12,18 +13,25 @@ class CheckPermission
     {
         $usuario = Auth::user();
 
-        // Si es admin, deja pasar
-        if ($usuario->hasRole('Admin')) {
+        if (! $usuario instanceof User) {
+            abort(403);
+        }
+
+        if ($usuario->isSuperUser()) {
             return $next($request);
         }
 
-        // Si tiene permiso, deja pasar
-        if ($usuario->hasPermiso($permiso)) {
+        if ($usuario->hasAccess((string) $permiso)) {
             return $next($request);
         }
 
-        // Si no tiene permiso, redirige o muestra error
-        return redirect()->route('dashboard')->with('error', 'No tienes permiso para acceder a esta sección');
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'message' => 'No tienes permiso para acceder a esta sección.',
+            ], 403);
+        }
+
+        return redirect()->route('home')->with('error', 'No tienes permiso para acceder a esta sección.');
     }
 }
 

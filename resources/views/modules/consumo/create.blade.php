@@ -24,6 +24,17 @@
         </div>
 
         <div class="card-body">
+            @if(!empty($requiresAssignedConsumptionWarehouse ?? false))
+                <div class="alert alert-info border-0 shadow-sm">
+                    <strong>Bodega asignada:</strong> {{ $assignedConsumptionWarehouse['nombre'] ?? 'Sin asignar' }}.
+                    @if(empty($assignedConsumptionWarehouse['id'] ?? null))
+                        Tu usuario notificador no tiene una bodega asignada para consumo. Solicita la asignación antes de registrar consumos.
+                    @else
+                        Solo podrás consumir desde esa bodega.
+                    @endif
+                </div>
+            @endif
+
             <form action="{{ $modoEdicion ? route('consumo.update', $consumo->id) : route('consumo.store') }}" method="POST" id="formConsumo">
                 @csrf
                 @if($modoEdicion)
@@ -150,7 +161,7 @@
                             </div>
                             <div class="col-md-1">
                                 <label class="small fw-bold">Cant.</label>
-                                <input type="number" id="in_cant" class="form-control form-control-sm border-primary" value="1" step="0.01">
+                                <input type="number" id="in_cant" class="form-control form-control-sm border-primary" value="1" step="0.001">
                             </div>
                             <div class="col-md-1">
                                 <label class="small fw-bold">U.M.</label>
@@ -201,7 +212,7 @@
                         <i class="fa-solid fa-arrow-left me-2"></i> Volver
                     </a>
                     <div class="d-flex align-items-center gap-3 flex-wrap">
-                        <div class="fs-6 fw-bold text-dark">Total: L <span id="totalGral">0.00</span></div>
+                        <div class="fs-6 fw-bold text-dark">Total: L <span id="totalGral">0.000</span></div>
                         <button type="submit" class="btn btn-success px-3 py-2 fw-bold shadow btn-sm">
                             <i class="fa-solid fa-floppy-disk me-2"></i> {{ $modoEdicion ? 'ACTUALIZAR CONSUMO' : 'GUARDAR CONSUMOS' }}
                         </button>
@@ -237,6 +248,8 @@
 const insumos = @json($insumos);
 const labores = @json($labores);
 const detallesIniciales = @json($detallesIniciales);
+const assignedConsumptionWarehouse = @json($assignedConsumptionWarehouse ?? null);
+const requiresAssignedConsumptionWarehouse = @json($requiresAssignedConsumptionWarehouse ?? false);
     const formularioConsumo = document.getElementById('formConsumo');
     const cultivoHead = document.getElementById('cultivo_id_head');
 
@@ -412,6 +425,10 @@ function inicializarSelectsBuscables() {
     refrescarSelectBusqueda('#in_secundaria', 'Buscar actividad...');
     refrescarSelectBusqueda('#in_bodega', 'Buscar bodega...');
     refrescarSelectBusqueda('#in_lote', 'Buscar lote...');
+}
+
+function assignedWarehouseKey() {
+    return String(assignedConsumptionWarehouse?.id || '').trim();
 }
 
 function obtenerOpcionSeleccionada(selectEl) {
@@ -812,11 +829,41 @@ function cargarInventarioPorIds(idsInsumo, selBodega, selLote) {
         if (inventarioPorInsumo.length === 0) {
             selBodega.innerHTML = '<option value="GENERAL">General (sin bodega)</option>';
             selLote.innerHTML = '<option value="GENERAL">General (sin lote)</option>';
+            selBodega.disabled = false;
             actualizarInfoLote();
             refrescarSelectBusqueda('#in_bodega', 'General');
             refrescarSelectBusqueda('#in_lote', 'General');
             return;
         }
+
+        if (requiresAssignedConsumptionWarehouse) {
+            const assignedKey = assignedWarehouseKey();
+            selBodega.disabled = true;
+
+            if (!assignedKey) {
+                selBodega.innerHTML = '<option value="">Sin bodega asignada</option>';
+                selLote.innerHTML = '<option value="">Sin lotes disponibles</option>';
+                refrescarSelectBusqueda('#in_bodega', 'Sin bodega asignada');
+                refrescarSelectBusqueda('#in_lote', 'Sin lotes disponibles');
+                return;
+            }
+
+            const assignedOptionExists = Array.from(selBodega.options).some(option => option.value === assignedKey);
+            if (!assignedOptionExists) {
+                selBodega.innerHTML = '<option value="">Sin inventario en bodega asignada</option>';
+                selLote.innerHTML = '<option value="">Sin lotes disponibles</option>';
+                refrescarSelectBusqueda('#in_bodega', 'Sin inventario en bodega asignada');
+                refrescarSelectBusqueda('#in_lote', 'Sin lotes disponibles');
+                return;
+            }
+
+            selBodega.value = assignedKey;
+            refrescarSelectBusqueda('#in_bodega', assignedConsumptionWarehouse?.nombre || 'Bodega asignada');
+            renderizarLotesPorBodega(assignedKey);
+            return;
+        }
+
+        selBodega.disabled = false;
 
         refrescarSelectBusqueda('#in_bodega', 'Buscar bodega...');
         refrescarSelectBusqueda('#in_lote', 'Buscar lote...');
@@ -1230,8 +1277,8 @@ function renderizarTabla(){
                     <input
                         type="number"
                         class="form-control form-control-sm"
-                        min="0.01"
-                        step="0.01"
+                        min="0.001"
+                        step="0.001"
                         value="${item.cantidad}"
                         onchange="actualizarCantidadDetalle(${index}, this.value)"
                     >
@@ -1241,8 +1288,8 @@ function renderizarTabla(){
                 </div>
             </td>
             <td>${item.unidad}</td>
-            <td class="text-end">L ${item.precio.toFixed(2)}</td>
-            <td class="text-end fw-bold">L ${item.subtotal.toFixed(2)}</td>
+            <td class="text-end">L ${item.precio.toFixed(3)}</td>
+            <td class="text-end fw-bold">L ${item.subtotal.toFixed(3)}</td>
             <td>
                 <button type="button" class="btn btn-sm btn-outline-danger" onclick="eliminarDetalle(${index})">
                     <i class="fa-solid fa-trash"></i>
@@ -1251,8 +1298,8 @@ function renderizarTabla(){
         </tr>`;
     });
 
-    document.getElementById('totalGral').innerText = total.toLocaleString('en-US',{minimumFractionDigits:2});
-    document.getElementById('h_total_consumo').value = total.toFixed(2); // Guardar total real en hidden
+    document.getElementById('totalGral').innerText = total.toLocaleString('en-US',{minimumFractionDigits:3, maximumFractionDigits:3});
+    document.getElementById('h_total_consumo').value = total.toFixed(3); // Guardar total real en hidden
 }
 
 // ------------------- ELIMINAR FILA -------------------
