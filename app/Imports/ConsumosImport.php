@@ -130,14 +130,17 @@ class ConsumosImport implements ToCollection, WithHeadingRow, SkipsEmptyRows, Wi
                     throw new \RuntimeException('El insumo con codigo ' . $insumoCodigo . ' no tiene unidad_medida configurada.');
                 }
 
-                $unidadEnviada = mb_strtoupper($this->limpiarTexto($this->obtenerValor($row, ['unidad_medida', 'unidad', 'u_m'])));
+                $unidadEnviadaRaw = $this->obtenerValor($row, ['unidad_medida', 'unidad', 'u_m']);
+                $unidadEnviada = mb_strtoupper($this->limpiarTexto($unidadEnviadaRaw));
                 if ($unidadEnviada !== '' && $unidadEnviada !== mb_strtoupper($unidad)) {
                     throw new \RuntimeException('La unidad_medida enviada (' . $unidadEnviada . ') no coincide con la configurada para el insumo (' . $unidad . ').');
                 }
 
+                $bodegaId = $this->obtenerValor($row, ['bodega_id', 'almacen_id']);
+                $bodegaNombre = $this->obtenerValor($row, ['bodega_nombre', 'bodega', 'almacen', 'almacen_nombre']);
                 $bodega = $this->resolverBodega(
-                    $this->obtenerValor($row, ['bodega_id', 'almacen_id']),
-                    $this->obtenerValor($row, ['bodega_nombre', 'bodega', 'almacen', 'almacen_nombre'])
+                    $bodegaId,
+                    $bodegaNombre
                 );
 
                 $lote = $this->normalizarLote($this->obtenerValor($row, ['lote_consumo', 'numero_lote', 'lote']));
