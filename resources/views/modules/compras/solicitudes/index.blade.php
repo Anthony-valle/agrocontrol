@@ -78,7 +78,7 @@
                                     @endforeach
                                 </select>
                             </div>
-                            <div class="col-6">
+                            <div class="col-md-6">
                                 <label class="form-label">Proyecto, obra o motivo</label>
                                 <input type="text" name="asunto" id="formAsunto" class="form-control" maxlength="150" value="{{ old('asunto') }}" required>
                             </div>

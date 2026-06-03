@@ -166,6 +166,8 @@ class CultivoController extends Controller
     // Eliminar cultivo
     public function cerrar(Cultivo $cultivo)
     {
+        $this->authorize('close', $cultivo);
+
         if (strtolower($cultivo->estado) === 'cerrado') {
             if (request()->ajax() || request()->expectsJson()) {
                 return response()->json(['info' => 'El cultivo ya está cerrado.'], 200);
@@ -187,6 +189,8 @@ class CultivoController extends Controller
 
     public function reactivar(Cultivo $cultivo)
     {
+        $this->authorize('reactivate', $cultivo);
+
         if (strtolower($cultivo->estado) !== 'cerrado') {
             if (request()->ajax() || request()->expectsJson()) {
                 return response()->json(['info' => 'El cultivo ya se encuentra activo.'], 200);

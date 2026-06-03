@@ -118,7 +118,7 @@
 
                         .acciones-usuario-wrap .btn {
                             min-width: 36px;
-                            height: 36px;
+                            min-height: 36px;
                             display: inline-flex;
                             align-items: center;
                             justify-content: center;
@@ -137,52 +137,6 @@
 
 <!-- SCRIPT VER CONTRASEÑA TEMPORAL (SOLO PROPIETARIO) -->
 <script>
-function initUsuarioBodegaConsumoState(scope = document) {
-    const rolSelect = scope.querySelector('#usuario_rol_id');
-    const bodegaSelect = scope.querySelector('#bodega_id_consumo');
-    const bodegaWrap = scope.querySelector('#bodegaConsumoWrap');
-    const bodegaHelp = scope.querySelector('#bodegaConsumoHelp');
-
-    if (!rolSelect || !bodegaSelect || !bodegaWrap) {
-        return;
-    }
-
-    const syncBodegaRequirement = () => {
-        const selectedOption = rolSelect.options[rolSelect.selectedIndex];
-        const roleName = String(selectedOption?.dataset?.roleName || '')
-            .toLowerCase()
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .replace(/[^a-z0-9]/g, '');
-        const isNotificador = roleName === 'notificador';
-
-        bodegaSelect.required = isNotificador;
-        bodegaSelect.disabled = !isNotificador;
-        bodegaWrap.classList.toggle('d-none', !isNotificador);
-        bodegaWrap.classList.toggle('border', isNotificador);
-        bodegaWrap.classList.toggle('rounded', isNotificador);
-        bodegaWrap.classList.toggle('p-2', isNotificador);
-        bodegaWrap.classList.toggle('bg-light', isNotificador);
-
-        if (!isNotificador) {
-            bodegaSelect.value = '';
-        }
-
-        if (bodegaHelp) {
-            bodegaHelp.textContent = isNotificador
-                ? 'Obligatoria para el rol notificador. Ese usuario solo podrá consumir desde esta bodega.'
-                : 'Opcional para otros roles.';
-        }
-    };
-
-    if (!rolSelect.dataset.boundBodegaConsumo) {
-        rolSelect.addEventListener('change', syncBodegaRequirement);
-        rolSelect.dataset.boundBodegaConsumo = '1';
-    }
-
-    syncBodegaRequirement();
-}
-
 document.addEventListener('click', function(e){
     if(!e.target.closest('.btnRevealTempPassword')){
         return;
@@ -365,8 +319,6 @@ document.getElementById('btnAbrirModal').addEventListener('click', function() {
         .then(html => {
             document.getElementById('modalContent').innerHTML = html;
             new bootstrap.Modal(document.getElementById('modalUsuario')).show();
-            initUsuarioBodegaConsumoState(document.getElementById('modalContent'));
-
             const password = document.getElementById('password');
             const confirmPassword = document.getElementById('password_confirmation');
 
@@ -524,8 +476,6 @@ document.addEventListener('click', function(e){
 
                 modalContentEdit.innerHTML = html;
                 new bootstrap.Modal(modalEditElement).show();
-                initUsuarioBodegaConsumoState(modalContentEdit);
-
                 const formEditarUsuario = modalContentEdit.querySelector('#formEditarUsuario') || modalContentEdit.querySelector(`form[action*="/usuarios/${id}"]`);
                 const password = formEditarUsuario?.querySelector('#password');
                 const confirmPassword = formEditarUsuario?.querySelector('#password_confirmation');

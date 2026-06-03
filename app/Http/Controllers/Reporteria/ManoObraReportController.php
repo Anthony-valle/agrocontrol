@@ -34,6 +34,36 @@ class ManoObraReportController extends Controller
                 'consumo_detalles.subtotal',
             ]);
 
+        $resumenCultivos = (clone $ejecucionesQuery)
+            ->get()
+            ->groupBy(fn ($fila) => trim((string) ($fila->cultivo ?: 'Sin cultivo')))
+            ->map(function ($items, $cultivo) {
+                return [
+                    'cultivo' => $cultivo,
+                    'registros' => $items->count(),
+                    'actividades' => $items->pluck('descripcion')->filter()->unique()->count(),
+                    'cantidad_total' => (float) $items->sum('cantidad'),
+                    'subtotal_total' => (float) $items->sum('subtotal'),
+                ];
+            })
+            ->sortByDesc('subtotal_total')
+            ->values();
+
+        $costosPorCultivoActividad = Consumo_detalles::query()
+            ->join('consumos', 'consumos.id', '=', 'consumo_detalles.consumo_id')
+            ->leftJoin('cultivos', 'cultivos.id', '=', 'consumos.cultivo_id')
+            ->where('consumo_detalles.categoria', 'Mano de Obra')
+            ->groupBy('cultivos.nombre', 'consumo_detalles.descripcion', 'consumo_detalles.unidad_medida')
+            ->orderByRaw('SUM(consumo_detalles.subtotal) DESC')
+            ->selectRaw('COALESCE(cultivos.nombre, ?) as cultivo', ['Sin cultivo'])
+            ->selectRaw('COALESCE(consumo_detalles.descripcion, ?) as actividad', ['Sin actividad'])
+            ->selectRaw('COALESCE(consumo_detalles.unidad_medida, ?) as unidad_medida', [''])
+            ->selectRaw('COUNT(*) as registros')
+            ->selectRaw('SUM(consumo_detalles.cantidad) as cantidad_total')
+            ->selectRaw('SUM(consumo_detalles.subtotal) as subtotal_total')
+            ->paginate($perPage, ['*'], 'detalle_page')
+            ->withQueryString();
+
         $ejecutado = (float) (clone $ejecucionesQuery)->sum('consumo_detalles.subtotal');
 
         $ejecuciones = $ejecucionesQuery
@@ -46,6 +76,7 @@ class ManoObraReportController extends Controller
             'costo_promedio' => (float) $labores->avg('costo_unitario'),
             'planificado' => $planificado,
             'ejecutado' => $ejecutado,
+            'cultivos_con_ejecucion' => $resumenCultivos->count(),
         ];
 
         $resumenSecundaria = $labores
@@ -61,6 +92,14 @@ class ManoObraReportController extends Controller
             ->sortByDesc('registros')
             ->values();
 
-        return view('modules.reporteria.mano_obra', compact('labores', 'metricas', 'resumenSecundaria', 'ejecuciones', 'perPage'));
+        return view('modules.reporteria.mano_obra', compact(
+            'labores',
+            'metricas',
+            'resumenSecundaria',
+            'resumenCultivos',
+            'costosPorCultivoActividad',
+            'ejecuciones',
+            'perPage'
+        ));
     }
 }

@@ -7,6 +7,16 @@ use App\Models\User;
 
 class CultivoPolicy
 {
+    public function close(User $user, Cultivo $cultivo): bool
+    {
+        return $user->hasAnyRole(['admin', 'administrador']);
+    }
+
+    public function reactivate(User $user, Cultivo $cultivo): bool
+    {
+        return $user->hasAnyRole(['admin', 'administrador']);
+    }
+
     public function view(User $user, Cultivo $cultivo): bool
     {
         return $user->isSuperUser() || $cultivo->created_by === $user->id;

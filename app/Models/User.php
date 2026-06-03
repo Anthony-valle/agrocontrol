@@ -13,6 +13,13 @@ class User extends Authenticatable
 {
     use Notifiable, SoftDeletes, TracksDeletionMetadata;
 
+    private const LEGACY_PERMISSION_ALIASES = [
+        'mano_obra' => ['labores'],
+        'preparacion_suelo' => ['labores'],
+        'mecanizacion' => ['labores'],
+        'reporte_mano_obra' => ['labores'],
+    ];
+
     private ?string $imagenUsuarioUrlCache = null;
 
     private const SUPER_USER_ROLES = [
@@ -206,7 +213,15 @@ class User extends Authenticatable
         // Si tiene permisos específicos asignados, usar esos
         $permissions = $this->access_permissions ?? [];
         if (!empty($permissions)) {
-            return in_array($permission, $permissions);
+            if (in_array($permission, $permissions, true)) {
+                return true;
+            }
+
+            foreach (self::LEGACY_PERMISSION_ALIASES[$permission] ?? [] as $legacyPermission) {
+                if (in_array($legacyPermission, $permissions, true)) {
+                    return true;
+                }
+            }
         }
 
         return false;

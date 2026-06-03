@@ -1,13 +1,4 @@
 <div class="modal-body">
-    <style>
-        .usuario-access-label {
-            white-space: nowrap;
-        }
-
-        .bodega-consumo-panel {
-            transition: all 0.2s ease;
-        }
-    </style>
     <div class="row g-3">
 
         <div class="col-md-6">
@@ -84,34 +75,6 @@
                     </option>
                 @endforeach
             </select>
-        </div>
-
-        <div class="col-md-4 d-none bodega-consumo-panel" id="bodegaConsumoWrap">
-            <label class="form-label">Bodega asignada para consumo</label>
-            <select name="bodega_id_consumo" id="bodega_id_consumo" class="form-select">
-                <option value="">Sin asignar</option>
-                @foreach(($bodegas ?? collect()) as $bodega)
-                    <option value="{{ $bodega->id }}" data-sucursal-id="{{ $bodega->sucursal_id }}" {{ (string) old('bodega_id_consumo', $user->bodega_id_consumo ?? '') === (string) $bodega->id ? 'selected' : '' }}>
-                        {{ $bodega->nombre }}
-                    </option>
-                @endforeach
-            </select>
-            <div class="form-text" id="bodegaConsumoHelp">Asigna la bodega que podrá usar el usuario para consumos.</div>
-        </div>
-
-        <div class="col-12 mb-3">
-            <label class="form-label">Permisos de acceso</label>
-            <div class="row g-2">
-                @php($selectedAccessPermissions = old('access_permissions', $user->access_permissions ?? []))
-                @foreach($accessOptions as $permission => $label)
-                    <div class="col-lg-4 col-md-6">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" name="access_permissions[]" value="{{ $permission }}" id="access_{{ $permission }}" {{ in_array($permission, $selectedAccessPermissions ?? [], true) ? 'checked' : '' }}>
-                            <label class="form-check-label usuario-access-label" for="access_{{ $permission }}">{{ $label }}</label>
-                        </div>
-                    </div>
-                @endforeach
-            </div>
         </div>
 
         <div class="col-md-8">

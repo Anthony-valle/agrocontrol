@@ -122,11 +122,11 @@
                                             <a href="{{ route('reporte.cultivo.historial', $item->id) }}" class="btn btn-secondary btn-sm me-1" title="Historial de consumo">
                                                 <i class="fa-solid fa-clock-rotate-left"></i>
                                             </a>
-                                            @if($item->estado !== 'Cerrado')
+                                            @if($item->estado !== 'Cerrado' && auth()->user()?->hasAnyRole(['admin', 'administrador']))
                                             <button type="button" class="btn btn-secondary btn-sm btnCerrarCultivo me-1" data-id="{{ $item->id }}" title="Cerrar cultivo">
                                                 <i class="fa-solid fa-lock"></i>
                                             </button>
-                                            @elseif(auth()->user()?->hasAnyRole(['propietario', 'admin', 'programador']))
+                                            @elseif(auth()->user()?->hasAnyRole(['admin', 'administrador']))
                                             <button type="button" class="btn btn-success btn-sm btnReactivarCultivo me-1" data-id="{{ $item->id }}" title="Reactivar cultivo">
                                                 <i class="fa-solid fa-lock-open"></i>
                                             </button>
@@ -401,6 +401,33 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    async function cargarContenidoModal(url, containerId, modalId, onLoaded = null) {
+        const response = await fetch(buildFreshUrl(url), {
+            cache: 'no-store',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Cache-Control': 'no-cache',
+                'Accept': 'text/html'
+            }
+        });
+
+        const html = await response.text();
+
+        if (!response.ok) {
+            throw new Error(response.status === 403
+                ? 'No tienes permiso para realizar esta acción.'
+                : 'No se pudo cargar la ventana solicitada.');
+        }
+
+        document.getElementById(containerId).innerHTML = html;
+        const modal = new bootstrap.Modal(document.getElementById(modalId));
+        modal.show();
+
+        if (typeof onLoaded === 'function') {
+            onLoaded();
+        }
+    }
+
     function mostrarFilas(filasVisibles){
         filas.forEach(f => f.style.display = "none");
         filasVisibles.forEach(f => f.style.display = "");
@@ -420,20 +447,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // CREAR
     document.getElementById("btnAbrirModal").addEventListener("click", () => {
-        fetch(buildFreshUrl("{{ route('cultivo.create') }}"), {
-            cache: 'no-store',
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest',
-                'Cache-Control': 'no-cache'
-            }
-        })
-            .then(res => res.text())
-            .then(html => {
-                document.getElementById("modalContent").innerHTML = html;
-                const modal = new bootstrap.Modal(document.getElementById("modalCultivo"));
-                modal.show();
-                bindAjaxForm('modalCultivo', 'modalContent', 'Cultivo registrado correctamente');
-            });
+        cargarContenidoModal("{{ route('cultivo.create') }}", 'modalContent', 'modalCultivo', () => {
+            bindAjaxForm('modalCultivo', 'modalContent', 'Cultivo registrado correctamente');
+        }).catch(error => {
+            Swal.fire('Acceso restringido', error.message, 'warning');
+        });
     });
 
     // EDITAR
@@ -441,20 +459,11 @@ document.addEventListener("DOMContentLoaded", () => {
         const btn = e.target.closest(".btnEditarCultivo");
         if(btn){
             const id = btn.dataset.id;
-            fetch(buildFreshUrl(`/cultivo/${id}/edit`), {
-                cache: 'no-store',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Cache-Control': 'no-cache'
-                }
-            })
-                .then(res => res.text())
-                .then(html => {
-                    document.getElementById("modalContentEdit").innerHTML = html;
-                    const modal = new bootstrap.Modal(document.getElementById("modalCultivoEdit"));
-                    modal.show();
-                    bindAjaxForm('modalCultivoEdit', 'modalContentEdit', 'Cultivo actualizado correctamente');
-                });
+            cargarContenidoModal(`/cultivo/${id}/edit`, 'modalContentEdit', 'modalCultivoEdit', () => {
+                bindAjaxForm('modalCultivoEdit', 'modalContentEdit', 'Cultivo actualizado correctamente');
+            }).catch(error => {
+                Swal.fire('Acceso restringido', error.message, 'warning');
+            });
         }
     });
 
@@ -463,19 +472,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const btn = e.target.closest(".btnVerCultivo");
         if(btn){
             const id = btn.dataset.id;
-            fetch(buildFreshUrl(`/cultivo/${id}`), {
-                cache: 'no-store',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Cache-Control': 'no-cache'
-                }
-            })
-                .then(res => res.text())
-                .then(html => {
-                    document.getElementById("modalContentShow").innerHTML = html;
-                    const modal = new bootstrap.Modal(document.getElementById("modalCultivoShow"));
-                    modal.show();
-                });
+            cargarContenidoModal(`/cultivo/${id}`, 'modalContentShow', 'modalCultivoShow').catch(error => {
+                Swal.fire('Acceso restringido', error.message, 'warning');
+            });
         }
     });
 

@@ -103,6 +103,12 @@ Route::middleware(['auth', AuditUserAction::class])->group(function () {
         ->middlewareFor(['destroy'], 'sensitive.actions');
 
     // USUARIOS
+    Route::get('usuarios/accesos', [UserController::class, 'accessIndex'])
+        ->middleware('module.access:usuarios')
+        ->name('usuarios.access.index');
+    Route::put('usuarios/{user}/accesos', [UserController::class, 'updateAccess'])
+        ->middleware('module.access:usuarios')
+        ->name('usuarios.access.update');
     Route::resource('usuarios', UserController::class)
         ->except(['show'])
         ->parameters(['usuarios' => 'user'])
@@ -141,7 +147,7 @@ Route::middleware(['auth', AuditUserAction::class])->group(function () {
         ->name('cultivo.importar.template');
     Route::resource('labores', LaboreController::class)
         ->except(['show'])
-        ->middleware('module.access:labores')
+        ->middleware('module.access:mano_obra')
         ->middlewareFor(['destroy'], 'sensitive.actions');
     Route::resource('lotes', LoteController::class)
         ->except(['show'])
@@ -163,14 +169,15 @@ Route::middleware(['auth', AuditUserAction::class])->group(function () {
     Route::resource('preparacion-suelo', PreparacionSueloController::class)
         ->parameters(['preparacion-suelo' => 'consumo'])
         ->except(['create'])
-        ->middleware('module.access:labores')
+        ->middleware('module.access:mecanizacion')
         ->middlewareFor(['destroy'], 'sensitive.actions');
     Route::resource('preparacion-suelo-actividades', PreparacionSueloActividadController::class)
         ->parameters(['preparacion-suelo-actividades' => 'actividad'])
         ->except(['show'])
-        ->middleware('module.access:labores')
+        ->middleware('module.access:preparacion_suelo')
         ->middlewareFor(['destroy'], 'sensitive.actions');
     Route::post('preparacion-suelo-actividades/{actividad}/restore', [PreparacionSueloActividadController::class, 'restore'])
+        ->middleware('module.access:preparacion_suelo')
         ->middleware('sensitive.actions')
         ->name('preparacion-suelo-actividades.restore');
     Route::resource('consumo', ConsumoController::class)
@@ -344,7 +351,9 @@ Route::middleware(['auth', AuditUserAction::class])->group(function () {
     Route::get('/reporteria/cosechas/excel', [\App\Http\Controllers\Reporteria\CosechasReportController::class, 'exportExcel'])->name('reporteria.cosechas.excel');
     Route::get('/reporteria/cosechas/pdf', [\App\Http\Controllers\Reporteria\CosechasReportController::class, 'exportPdf'])->name('reporteria.cosechas.pdf');
     // Reporterías de mano de obra
-    Route::get('/reporteria/mano-obra', [\App\Http\Controllers\Reporteria\ManoObraReportController::class, 'index'])->name('reporteria.mano_obra');
+    Route::get('/reporteria/mano-obra', [\App\Http\Controllers\Reporteria\ManoObraReportController::class, 'index'])
+        ->middleware('module.access:reporte_mano_obra')
+        ->name('reporteria.mano_obra');
     // Reporterías de rentabilidad
     Route::get('/reporteria/rentabilidad', [\App\Http\Controllers\Reporteria\RentabilidadReportController::class, 'index'])->name('reporteria.rentabilidad');
     // Reporterías de alertas y notificaciones

@@ -59,14 +59,14 @@
                     </a>
                 </li>
                 @endif
-                @if(auth()->user()->hasAccess('labores'))
+                @if(auth()->user()->hasAccess('mano_obra'))
                 <li>
                     <a href="{{ route('labores.index') }}">
                         <i class="bi bi-person-workspace fs-6 me-2"></i><span>Mano de Obra</span>
                     </a>
                 </li>
                 @endif
-                @if(auth()->user()->hasAccess('labores'))
+                @if(auth()->user()->hasAccess('preparacion_suelo'))
                 <li>
                     <a href="{{ route('preparacion-suelo-actividades.index') }}">
                         <i class="bi bi-truck fs-6 me-2"></i><span>Actividades de Preparación de Suelo</span>
@@ -218,7 +218,7 @@
                 </li>
                 @endif
 
-                @if(auth()->user()->hasAccess('labores'))
+                @if(auth()->user()->hasAccess('reporte_mano_obra'))
                 <li>
                     <a href="{{ route('reporteria.mano_obra') }}">
                         <i class="bi bi-person-workspace fs-6 me-2"></i>
@@ -307,7 +307,7 @@
                     </a>
                 </li>
                 @endif
-                @if(auth()->user()->hasAccess('labores'))
+                @if(auth()->user()->hasAccess('mecanizacion'))
                 <li>
                     <a href="{{ route('preparacion-suelo.index')}}">
                         <i class="bi bi-truck fs-6 me-2"></i><span>Mecanización</span>
@@ -331,8 +331,13 @@
                     </a>
                 </li>
                 <li>
+                    <a href="{{ route('usuarios.access.index') }}">
+                        <i class="bi bi-person-check fs-6 me-2"></i><span>Accesos por Usuario</span>
+                    </a>
+                </li>
+                <li>
                     <a href="{{ route('rol.index')}}">
-                        <i class="bi bi-shield-lock fs-6 me-2"></i><span>Roles y Permisos</span>
+                        <i class="bi bi-shield-lock fs-6 me-2"></i><span>Roles</span>
                     </a>
                 </li>
             </ul>

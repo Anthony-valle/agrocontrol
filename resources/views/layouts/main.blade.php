@@ -67,12 +67,27 @@
       min-width: 0;
     }
 
+    #main.main .table thead.table-light,
+    #main.main .table thead.table-success,
+    #main.main .agro-table thead {
+      background: #0f5a43;
+    }
+
     #main.main .table thead.table-light th,
-    #main.main .table thead.table-success th {
+    #main.main .table thead.table-success th,
+    #main.main .agro-table thead th {
       background: #0f5a43;
       color: #fff;
       border-color: #0f5a43;
       font-weight: 600;
+    }
+
+    #main.main .table thead th {
+      padding: 0.68rem 0.82rem !important;
+      vertical-align: middle;
+      white-space: nowrap;
+      font-size: 0.96rem !important;
+      line-height: 1.15;
     }
 
     #main.main .table-hover tbody tr:hover {
@@ -183,25 +198,64 @@
 
     #main.main .agro-table-shell {
       border: 1px solid rgba(15, 90, 67, 0.14);
-      border-radius: 12px;
+      border-radius: 14px;
       overflow: hidden;
       background: #fff;
     }
 
     #main.main .agro-table {
       --bs-table-bg: transparent;
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      border-left: 1px solid #d7e3dc;
+      border-right: 1px solid #d7e3dc;
     }
 
     #main.main .agro-table thead th {
       white-space: nowrap;
+      background-clip: padding-box;
+      border-right: 1px solid rgba(255, 255, 255, 0.18);
+      border-bottom: 1px solid #0c4f3b;
     }
 
+    #main.main .agro-table thead th:last-child,
+    #main.main .table thead th:last-child,
+    .modal .table thead th:last-child {
+      border-right: 0;
+    }
+
+    #main.main .table tbody td,
+    #main.main .table tfoot th,
+    #main.main .table tfoot td,
+    #main.main .table thead th,
     #main.main .agro-table tbody td,
     #main.main .agro-table tfoot th,
-    #main.main .agro-table tfoot td {
-      padding: 0.62rem 0.7rem;
+    #main.main .agro-table tfoot td,
+    .modal .table tbody td,
+    .modal .table tfoot th,
+    .modal .table tfoot td,
+    .modal .table thead th {
+      padding: 0.72rem 0.82rem !important;
       border-color: #d7e3dc;
       vertical-align: middle;
+      line-height: 1.25;
+      border-right: 1px solid #d7e3dc;
+      border-bottom: 1px solid #d7e3dc;
+    }
+
+    #main.main .table tbody td:last-child,
+    #main.main .table tfoot th:last-child,
+    #main.main .table tfoot td:last-child,
+    #main.main .table thead th:last-child,
+    #main.main .agro-table tbody td:last-child,
+    #main.main .agro-table tfoot th:last-child,
+    #main.main .agro-table tfoot td:last-child,
+    .modal .table tbody td:last-child,
+    .modal .table tfoot th:last-child,
+    .modal .table tfoot td:last-child,
+    .modal .table thead th:last-child {
+      border-right: 0;
     }
 
     #main.main .agro-table .btn.btn-sm {
@@ -217,10 +271,11 @@
     }
 
     #main.main .agro-table-actions {
-      display: flex;
-      flex-wrap: wrap;
+      display: inline-flex;
+      flex-wrap: nowrap;
       gap: 0.35rem;
       align-items: center;
+      justify-content: center;
     }
 
     #main.main .table tbody td .btn.btn-sm,
@@ -229,10 +284,10 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 0.35rem;
-      min-width: 38px;
-      min-height: 38px;
-      padding: 0.45rem 0.8rem;
+      gap: 0.3rem;
+      min-width: 36px !important;
+      min-height: 36px !important;
+      padding: 0.4rem 0.72rem !important;
       border-radius: 999px;
       font-weight: 700;
       border-width: 0;
@@ -252,9 +307,14 @@
     #main.main .table tbody td .btn.btn-sm i,
     #main.main .table tbody td .btn.btn-sm svg,
     #main.main .table tbody td .btn-group-sm > .btn i,
-    #main.main .table tbody td .agro-table-actions .btn i {
-      font-size: 0.95rem;
+    #main.main .table tbody td .btn-group-sm > .btn svg,
+    #main.main .table tbody td .agro-table-actions .btn i,
+    #main.main .table tbody td .agro-table-actions .btn svg {
+      font-size: 0.92rem !important;
+      width: 0.92rem !important;
+      height: 0.92rem !important;
       line-height: 1;
+      flex: 0 0 auto;
     }
 
     #main.main .table tbody td .btn.btn-warning,
@@ -296,6 +356,14 @@
     }
 
     #main.main .table tbody td .btn.btn-info,
+    #main.main .table tbody td .btn-info.btn-sm {
+      background: linear-gradient(180deg, #3bc9db 0%, #0ea5b7 100%);
+      color: #fff;
+    }
+
+    #main.main .table tbody td.text-center.text-nowrap {
+      width: 1%;
+    }
     #main.main .table tbody td .btn-info.btn-sm {
       background: linear-gradient(180deg, #3bc9db 0%, #0ea5b7 100%);
       color: #fff;
@@ -383,16 +451,19 @@
       max-width: 100%;
       overflow-x: auto;
       overflow-y: hidden;
-      scrollbar-gutter: stable both-edges;
       scrollbar-width: thin;
       scrollbar-color: rgba(15, 90, 67, 0.45) rgba(15, 90, 67, 0.08);
     }
 
     #main.main .table-responsive > .table,
     #main.main .table-responsive > table {
-      width: max-content;
+      width: 100%;
       min-width: 100%;
       margin-bottom: 0;
+      border-collapse: separate;
+      border-spacing: 0;
+      border-left: 1px solid #d7e3dc;
+      border-right: 1px solid #d7e3dc;
     }
 
     #main.main .table-responsive.border.rounded,
@@ -410,15 +481,17 @@
     #main.main .table-responsive.border.rounded > .table thead th:first-child,
     #main.main .table-responsive.border.rounded.shadow-sm > .table thead th:first-child,
     #main.main .table-responsive.border.rounded.bg-white > .table thead th:first-child,
-    #main.main .table-responsive.border.rounded.shadow-sm.bg-white > .table thead th:first-child {
-      border-top-left-radius: 12px;
+    #main.main .table-responsive.border.rounded.shadow-sm.bg-white > .table thead th:first-child,
+    #main.main .agro-table-shell > .agro-table thead th:first-child {
+      border-top-left-radius: 14px;
     }
 
     #main.main .table-responsive.border.rounded > .table thead th:last-child,
     #main.main .table-responsive.border.rounded.shadow-sm > .table thead th:last-child,
     #main.main .table-responsive.border.rounded.bg-white > .table thead th:last-child,
-    #main.main .table-responsive.border.rounded.shadow-sm.bg-white > .table thead th:last-child {
-      border-top-right-radius: 12px;
+    #main.main .table-responsive.border.rounded.shadow-sm.bg-white > .table thead th:last-child,
+    #main.main .agro-table-shell > .agro-table thead th:last-child {
+      border-top-right-radius: 14px;
     }
 
     #main.main .table-responsive::-webkit-scrollbar {
@@ -446,14 +519,13 @@
       max-width: 100%;
       overflow-x: auto;
       overflow-y: hidden;
-      scrollbar-gutter: stable both-edges;
     }
 
     #main.main .agro-auto-table-wrap > .table,
     .modal .agro-auto-table-wrap > .table,
     #main.main .datatable-wrapper .datatable-table,
     .modal .datatable-wrapper .datatable-table {
-      width: max-content;
+      width: 100%;
       min-width: 100%;
       margin-bottom: 0;
     }
